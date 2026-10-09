@@ -26,6 +26,7 @@
   license,
   depends,
   maintainer,
+  recommends ? [ ],
   release ? "1",
 }:
 let
@@ -38,6 +39,7 @@ let
     url=${lib.escapeShellArg homepage}
     license=(${lib.escapeShellArg license})
     depends=(${lib.concatMapStringsSep " " lib.escapeShellArg depends})
+    optdepends=(${lib.concatMapStringsSep " " lib.escapeShellArg recommends})
     source=()
     sha256sums=()
 

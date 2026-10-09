@@ -114,7 +114,9 @@ For projects with a different layout, use `metarepo.lib.forPkgs pkgs`. It expose
 
 - `mkApt`, `mkDnf`, `mkPacman`: functions taking `name`, `version`, `payload`,
   `architecture`, `description`, `homepage`, `maintainer`, `depends`, `license`,
-  and optional `release` (default `"1"`). `payload` is a derivation with a native
+  optional `recommends` (default `[]`), and optional `release` (default `"1"`).
+  `recommends` maps to APT `Recommends`, RPM `Recommends`, and pacman
+  `optdepends`. `payload` is a derivation with a native
   filesystem tree such as `usr/bin/`, not a Nix store closure.
 - `mkPublic { publications; repository; }`: an unsigned repository derivation.
   Its `builder` attribute is the executable derivation that generates `public/`

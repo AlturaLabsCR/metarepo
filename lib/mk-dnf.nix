@@ -14,6 +14,7 @@
   license,
   depends,
   maintainer,
+  recommends ? [ ],
   release ? "1",
 }:
 let
@@ -28,6 +29,7 @@ let
     BuildArch: ${architecture}
     AutoReqProv: no
     ${lib.concatMapStringsSep "\n" (dep: "Requires: ${dep}") depends}
+    ${lib.concatMapStringsSep "\n" (dep: "Recommends: ${dep}") recommends}
 
     %description
     ${description}

@@ -14,6 +14,7 @@
   maintainer,
   depends,
   license,
+  recommends ? [ ],
   release ? "1",
 }:
 let
@@ -28,6 +29,7 @@ let
         "Priority: optional"
       ]
       ++ lib.optional (depends != [ ]) "Depends: ${lib.concatStringsSep ", " depends}"
+      ++ lib.optional (recommends != [ ]) "Recommends: ${lib.concatStringsSep ", " recommends}"
       ++ [
         "Homepage: ${homepage}"
         "Description: ${description}"

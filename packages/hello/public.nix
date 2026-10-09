@@ -30,6 +30,11 @@ let
     dnf = [ ];
     pacman = [ ];
   };
+  recommendations = {
+    apt = [ ];
+    dnf = [ ];
+    pacman = [ ];
+  };
   packages = lib.mapAttrs (
     format: builder:
     builder (
@@ -37,6 +42,7 @@ let
       // {
         architecture = package.passthru.packageArchitectures.${format};
         depends = dependencies.${format};
+        recommends = recommendations.${format};
       }
     )
   ) builders;
