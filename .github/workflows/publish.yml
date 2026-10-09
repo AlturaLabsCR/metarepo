@@ -1,0 +1,55 @@
+name: Publish repository
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: cachix/install-nix-action@v31
+
+      - name: Import and verify optional GPG key
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
+        run: |
+          if [ -z "$GPG_PRIVATE_KEY" ] && [ -z "$GPG_KEY_ID" ]; then
+            echo "Signing secrets are not set; building an unsigned repository."
+            exit 0
+          fi
+          if [ -z "$GPG_PRIVATE_KEY" ] || [ -z "$GPG_KEY_ID" ]; then
+            echo "error: set both GPG_PRIVATE_KEY and GPG_KEY_ID to enable signing" >&2
+            exit 1
+          fi
+          printf '%s\n' "$GPG_PRIVATE_KEY" | gpg --batch --import
+          gpg --batch --list-secret-keys "$GPG_KEY_ID" >/dev/null
+          printf 'GPG_KEY_ID=%s\n' "$GPG_KEY_ID" >> "$GITHUB_ENV"
+
+      - run: nix run .#build-public
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          name: metarepo-pages
+          path: public
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
+        with:
+          artifact_name: metarepo-pages
