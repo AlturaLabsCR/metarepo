@@ -6,7 +6,7 @@
 }:
 { publications, repository }:
 let
-  channelNames = builtins.attrNames repository.channels;
+  configuredChannelNames = builtins.attrNames repository.channels;
   channel =
     name:
     let
@@ -28,7 +28,10 @@ let
         entry: entry.architecture or entry.package.passthru.metarepo.architecture
       ) entries;
     };
-  channels = lib.genAttrs channelNames channel;
+  configuredChannels = lib.genAttrs configuredChannelNames channel;
+  # A configured channel is published only when at least one package subscribes.
+  channelNames = lib.filter (name: configuredChannels.${name}.packages != [ ]) configuredChannelNames;
+  channels = lib.genAttrs channelNames (name: configuredChannels.${name});
   repositoriesOf = format: lib.filter (name: channels.${name}.format == format) channelNames;
   aptSuites = repositoriesOf "apt";
   repositoryArchitectures =
@@ -85,7 +88,7 @@ let
 in
 assert lib.assertMsg (lib.all validToken (
   channelNames
-  ++ lib.concatMap (name: channels.${name}.releases) channelNames
+  ++ lib.concatMap (name: configuredChannels.${name}.releases) configuredChannelNames
   ++ supportedReleases
   ++ lib.concatMap (name: channels.${name}.architectures) channelNames
   ++ [ repository.id ]
