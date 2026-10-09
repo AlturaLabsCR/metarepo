@@ -86,7 +86,7 @@ _install_pacman() {
   install -d -m 0755 /etc/pacman.d/repos.d
   : > "/etc/pacman.d/repos.d/$REPO_ID.conf"
   cat >> "/etc/pacman.d/repos.d/$REPO_ID.conf" <<INI
-[$REPO_ID-$repository]
+[$REPO_ID]
 SigLevel = Required
 Server = $REPO_ROOT/$repository/
 

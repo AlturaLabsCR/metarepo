@@ -60,7 +60,7 @@ rm -f "$tmp"
 Add the repository to `/etc/pacman.conf`:
 
 ```ini
-[metarepo-arch]
+[metarepo]
 SigLevel = Required
 Server = https://packages.example.org/metarepo/arch/
 ```
