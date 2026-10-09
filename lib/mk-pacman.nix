@@ -74,6 +74,10 @@ let
 in
 runCommand "${name}-arch-${version}"
   {
+    passthru.metarepo = {
+      format = "pacman";
+      inherit architecture;
+    };
     nativeBuildInputs = [
       pacmanTools
       pacman

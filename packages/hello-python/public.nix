@@ -1,5 +1,5 @@
 {
-  callPackage,
+  metarepo,
   runCommand,
   package,
 }:
@@ -20,21 +20,21 @@ let
     license = package.meta.license.spdxId;
     maintainer = "Hello Python Authors <hello-python@example.invalid>";
   };
-  deb = callPackage ../../lib/mk-deb.nix { } (
+  apt = metarepo.mkApt (
     common
     // {
-      architecture = package.passthru.packageArchitectures.deb;
+      architecture = package.passthru.packageArchitectures.apt;
       depends = [ "python3" ];
     }
   );
-  dnf = callPackage ../../lib/mk-rpm.nix { } (
+  dnf = metarepo.mkDnf (
     common
     // {
       architecture = package.passthru.packageArchitectures.dnf;
       depends = [ "python3" ];
     }
   );
-  arch = callPackage ../../lib/mk-arch.nix { } (
+  pacman = metarepo.mkPacman (
     common
     // {
       architecture = package.passthru.packageArchitectures.pacman;
@@ -45,24 +45,25 @@ in
 {
   channels = {
     jammy = {
-      format = "apt";
-      package = deb;
-      architecture = package.passthru.packageArchitectures.deb;
+      releases = [ "ubuntu2204" ];
+      package = apt;
     };
     noble = {
-      format = "apt";
-      package = deb;
-      architecture = package.passthru.packageArchitectures.deb;
+      releases = [
+        "ubuntu2404"
+        "ubuntu2604"
+        "debian13"
+        "linuxmint7"
+      ];
+      package = apt;
     };
     fedora = {
-      format = "dnf";
+      releases = [ "fedora44" ];
       package = dnf;
-      architecture = package.passthru.packageArchitectures.dnf;
     };
     arch = {
-      format = "pacman";
-      package = arch;
-      architecture = package.passthru.packageArchitectures.pacman;
+      releases = [ "arch" ];
+      package = pacman;
     };
   };
 }

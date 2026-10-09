@@ -33,13 +33,27 @@ let
     set -eu
     export PATH=${lib.makeBinPath runtimeInputs}:$PATH
     export PACKAGE_DIR="${packages}"
-    export APT_SUITES="${builtins.concatStringsSep " " repositories.apt.suites}"
-    export APT_ARCHITECTURES="${builtins.concatStringsSep " " repositories.apt.architectures}"
-    export DNF_REPOSITORIES="${builtins.concatStringsSep " " repositories.dnf}"
-    export PACMAN_REPOSITORIES="${builtins.concatStringsSep " " repositories.pacman}"
-    export REPOSITORY_ID="${repository.id}"
-    export REPOSITORY_ORIGIN="${repository.origin}"
-    export REPOSITORY_LABEL="${repository.label}"
+    export APT_SUITES=${lib.escapeShellArg (lib.concatStringsSep " " repositories.apt.suites)}
+    export DNF_REPOSITORIES=${lib.escapeShellArg (lib.concatStringsSep " " repositories.dnf)}
+    export PACMAN_REPOSITORIES=${lib.escapeShellArg (lib.concatStringsSep " " repositories.pacman)}
+    export REPOSITORY_ID=${lib.escapeShellArg repository.id}
+    export REPOSITORY_ORIGIN=${lib.escapeShellArg repository.origin}
+    export REPOSITORY_LABEL=${lib.escapeShellArg repository.label}
+    apt_architectures() {
+      case "$1" in
+        ${lib.concatMapStringsSep "\n" (
+          suite:
+          "${lib.escapeShellArg suite}) printf '%s\\n' ${
+            lib.escapeShellArg (
+              lib.concatStringsSep " " (
+                repositories.apt.architecturesBySuite.${suite} or repositories.apt.architectures
+              )
+            )
+          } ;;"
+        ) repositories.apt.suites}
+        *) return 1 ;;
+      esac
+    }
     ${builtins.readFile ./repository.sh}
   '';
   builder = writeScriptBin "build-public" ''

@@ -1,7 +1,10 @@
 #!/bin/sh
 
+set -eu
+
 if [ -f .env ]; then
   set -a
+  # shellcheck disable=SC1091
   . ./.env
   set +a
 fi
@@ -33,10 +36,11 @@ fi
 for suite in $APT_SUITES; do
   (
     cd "$suite"
+    architectures="$(apt_architectures "$suite")"
     mkdir -p pool/main
     mv ./*.deb pool/main/
     release="dists/$suite"
-    for arch in $APT_ARCHITECTURES; do
+    for arch in $architectures; do
       index="$release/main/binary-$arch/Packages"
       mkdir -p "$(dirname "$index")"
       dpkg-scanpackages --arch "$arch" pool/main > "$index"
@@ -47,7 +51,7 @@ for suite in $APT_SUITES; do
       -o "APT::FTPArchive::Release::Label=$REPOSITORY_LABEL" \
       -o "APT::FTPArchive::Release::Suite=$suite" \
       -o "APT::FTPArchive::Release::Codename=$suite" \
-      -o "APT::FTPArchive::Release::Architectures=${APT_ARCHITECTURES}" \
+      -o "APT::FTPArchive::Release::Architectures=${architectures}" \
       -o APT::FTPArchive::Release::Components=main \
       release "$release" > Release
     mv Release "$release/Release"

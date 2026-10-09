@@ -12,8 +12,10 @@ let
   channel =
     name:
     let
-      entries = lib.filter (publication: builtins.hasAttr name publication.channels) publications;
-      formats = map (publication: publication.channels.${name}.format) entries;
+      entries = map (publication: publication.channels.${name}) (
+        lib.filter (publication: builtins.hasAttr name publication.channels) publications
+      );
+      formats = map (entry: entry.format or entry.package.passthru.metarepo.format) entries;
       format = builtins.head formats;
     in
     assert lib.all (candidate: candidate == format) formats;
@@ -24,76 +26,46 @@ let
     ];
     {
       inherit format;
-      packages = map (publication: publication.channels.${name}.package) entries;
-      architectures = map (publication: publication.channels.${name}.architecture) entries;
+      releases = lib.unique (lib.concatMap (entry: entry.releases or [ ]) entries);
+      packages = map (entry: entry.package) entries;
+      architectures = map (
+        entry: entry.architecture or entry.package.passthru.metarepo.architecture
+      ) entries;
     };
   channels = lib.genAttrs channelNames channel;
   repositoriesOf = format: lib.filter (name: channels.${name}.format == format) channelNames;
   aptSuites = repositoriesOf "apt";
-  repositoryArchitectures = names: lib.unique (
-    lib.concatMap (name: channels.${name}.architectures) names
-  );
+  repositoryArchitectures =
+    names: lib.unique (lib.concatMap (name: channels.${name}.architectures) names);
   aptArchitectures = repositoryArchitectures aptSuites;
-  dnfArchitectures = repositoryArchitectures repositories.dnf;
-  pacmanArchitectures = repositoryArchitectures repositories.pacman;
-  aptReleaseMappings = [
-    { release = "ubuntu2404"; suite = "noble"; }
-    { release = "ubuntu2604"; suite = "noble"; }
-    { release = "debian13"; suite = "noble"; }
-    { release = "linuxmint7"; suite = "noble"; }
-    { release = "ubuntu2204"; suite = "jammy"; }
-  ];
-  availableAptReleaseMappings = lib.filter
-    (mapping: builtins.elem mapping.suite repositories.apt.suites)
-    aptReleaseMappings;
-  aptInstallCases = lib.concatMapStringsSep "\n"
-    (suite:
-      let
-        aliases = map (mapping: mapping.release) (lib.filter
-          (mapping: mapping.suite == suite)
-          availableAptReleaseMappings);
-        releases = [ suite ] ++ aliases;
-      in
-      "    ${lib.concatStringsSep "|" releases}) _install_apt ${suite} ;;")
-    repositories.apt.suites;
-  dnfInstallCases = if repositories.dnf == [ ] then "" else "    fedora44) _install_dnf ;;";
-  pacmanInstallCases = if repositories.pacman == [ ] then "" else "    arch) _install_arch ;;";
-  supportedReleases = lib.unique (
-    repositories.apt.suites
-    ++ map (mapping: mapping.release) availableAptReleaseMappings
-    ++ (if repositories.dnf == [ ] then [ ] else [ "fedora44" ])
-    ++ (if repositories.pacman == [ ] then [ ] else [ "arch" ])
+  # Only evaluated publications contribute channels and installer aliases.
+  selectors = name: lib.unique ([ name ] ++ channels.${name}.releases);
+  supportedReleases = lib.concatMap selectors channelNames;
+  validToken =
+    token: builtins.isString token && builtins.match "[a-zA-Z0-9][a-zA-Z0-9_+-]*" token != null;
+  installCases = lib.concatMapStringsSep "\n" (
+    name:
+    let
+      entry = channels.${name};
+      arguments = lib.concatMapStringsSep " " lib.escapeShellArg [
+        name
+        (lib.concatStringsSep " " (lib.unique entry.architectures))
+      ];
+    in
+    "    ${lib.concatStringsSep "|" (selectors name)}) _install_${entry.format} ${arguments} ;;"
+  ) channelNames;
+  installScript = writeText "install.sh" (
+    lib.replaceStrings
+      [ "@REPO_ROOT@" "@REPO_ID@" "@REPO_LABEL@" "@SUPPORTED@" "@INSTALL_CASES@" ]
+      [
+        (lib.escapeShellArg repository.url)
+        (lib.escapeShellArg repository.id)
+        (lib.escapeShellArg repository.label)
+        (lib.escapeShellArg (lib.concatStringsSep " " supportedReleases))
+        installCases
+      ]
+      (builtins.readFile ./install.sh)
   );
-  installScript = writeText "install.sh" (lib.replaceStrings
-    [
-      "@REPO_ROOT@"
-      "@REPO_ID@"
-      "@REPO_LABEL@"
-      "@APT_ARCHITECTURES@"
-      "@DNF_ARCHITECTURES@"
-      "@DNF_REPOSITORIES@"
-      "@PACMAN_ARCHITECTURES@"
-      "@PACMAN_REPOSITORIES@"
-      "@SUPPORTED@"
-      "@APT_INSTALL_CASES@"
-      "@DNF_INSTALL_CASES@"
-      "@PACMAN_INSTALL_CASES@"
-    ]
-    [
-      (lib.escapeShellArg repository.url)
-      (lib.escapeShellArg repository.id)
-      (lib.escapeShellArg repository.label)
-      (lib.escapeShellArg (lib.concatStringsSep " " aptArchitectures))
-      (lib.escapeShellArg (lib.concatStringsSep " " dnfArchitectures))
-      (lib.escapeShellArg (lib.concatStringsSep " " repositories.dnf))
-      (lib.escapeShellArg (lib.concatStringsSep " " pacmanArchitectures))
-      (lib.escapeShellArg (lib.concatStringsSep " " repositories.pacman))
-      (lib.escapeShellArg (lib.concatStringsSep " " supportedReleases))
-      aptInstallCases
-      dnfInstallCases
-      pacmanInstallCases
-    ]
-    (builtins.readFile ./install.sh));
   packages = runCommand "repository-packages" { } ''
     mkdir -p "$out"
     ${lib.concatMapStringsSep "\n" (name: ''
@@ -109,9 +81,24 @@ let
     apt = {
       suites = aptSuites;
       architectures = aptArchitectures;
+      architecturesBySuite = lib.genAttrs aptSuites (name: lib.unique channels.${name}.architectures);
     };
     dnf = repositoriesOf "dnf";
     pacman = repositoriesOf "pacman";
   };
 in
-callPackage ./mk-repository.nix { } { inherit packages repositories repository; }
+assert lib.assertMsg (lib.all validToken (
+  channelNames
+  ++ supportedReleases
+  ++ lib.concatMap (name: channels.${name}.architectures) channelNames
+  ++ [ repository.id ]
+)) "metarepo: invalid repository ID, channel, release or architecture";
+assert lib.assertMsg (
+  builtins.length supportedReleases == builtins.length (lib.unique supportedReleases)
+) "metarepo: a release selector cannot refer to multiple channels";
+(callPackage ./mk-repository.nix { } { inherit packages repositories repository; }).overrideAttrs
+  (old: {
+    passthru = (old.passthru or { }) // {
+      inherit installScript;
+    };
+  })

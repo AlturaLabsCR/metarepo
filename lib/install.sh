@@ -6,11 +6,6 @@ REPO_ROOT=@REPO_ROOT@
 REPO_ID=@REPO_ID@
 REPO_LABEL=@REPO_LABEL@
 REPO_KEY="$REPO_ID.asc"
-APT_ARCHITECTURES=@APT_ARCHITECTURES@
-DNF_ARCHITECTURES=@DNF_ARCHITECTURES@
-DNF_REPOSITORIES=@DNF_REPOSITORIES@
-PACMAN_ARCHITECTURES=@PACMAN_ARCHITECTURES@
-PACMAN_REPOSITORIES=@PACMAN_REPOSITORIES@
 SUPPORTED=@SUPPORTED@
 
 if [ "$(id -u)" -ne 0 ]; then
@@ -34,11 +29,12 @@ _check_architecture() {
 
 _install_apt() {
   suite="$1"
+  available="$2"
   architecture="$(dpkg --print-architecture)"
-  if [ "$APT_ARCHITECTURES" = all ]; then
+  if [ "$available" = all ]; then
     architecture=all
   fi
-  _check_architecture "$APT_ARCHITECTURES" "$architecture"
+  _check_architecture "$available" "$architecture"
 
   install -d -m 0755 /usr/share/keyrings
   curl -fsSLo "/usr/share/keyrings/$REPO_KEY" "$REPO_ROOT/$REPO_KEY"
@@ -49,8 +45,9 @@ _install_apt() {
 }
 
 _install_dnf() {
+  repository="$1"
   architecture="$(uname -m)"
-  _check_architecture "$DNF_ARCHITECTURES" "$architecture"
+  _check_architecture "$2" "$architecture"
 
   tmp="$(mktemp)"
   trap 'rm -f "$tmp"' 0
@@ -59,8 +56,7 @@ _install_dnf() {
   rpm --import "/etc/pki/rpm-gpg/$REPO_KEY"
 
   install -d -m 0755 /etc/yum.repos.d
-  for repository in $DNF_REPOSITORIES; do
-    cat > "/etc/yum.repos.d/$REPO_ID-$repository.repo" <<INI
+  cat > "/etc/yum.repos.d/$REPO_ID-$repository.repo" <<INI
 [$REPO_ID-$repository]
 name=$REPO_LABEL ($repository)
 baseurl=$REPO_ROOT/$repository/
@@ -70,12 +66,12 @@ gpgcheck=1
 repo_gpgcheck=0
 gpgkey=file:///etc/pki/rpm-gpg/$REPO_KEY
 INI
-  done
 }
 
-_install_arch() {
+_install_pacman() {
+  repository="$1"
   architecture="$(uname -m)"
-  _check_architecture "$PACMAN_ARCHITECTURES" "$architecture"
+  _check_architecture "$2" "$architecture"
 
   tmp="$(mktemp)"
   trap 'rm -f "$tmp"' 0
@@ -89,14 +85,12 @@ _install_arch() {
 
   install -d -m 0755 /etc/pacman.d/repos.d
   : > "/etc/pacman.d/repos.d/$REPO_ID.conf"
-  for repository in $PACMAN_REPOSITORIES; do
-    cat >> "/etc/pacman.d/repos.d/$REPO_ID.conf" <<INI
+  cat >> "/etc/pacman.d/repos.d/$REPO_ID.conf" <<INI
 [$REPO_ID-$repository]
 SigLevel = Required
 Server = $REPO_ROOT/$repository/
 
 INI
-  done
 
   if ! grep -Eq '^ *Include *= */etc/pacman\.d/repos\.d/\*\.conf *(#.*)?$' /etc/pacman.conf; then
     printf '\nInclude = /etc/pacman.d/repos.d/*.conf\n' >> /etc/pacman.conf
@@ -107,9 +101,7 @@ INI
 
 _install_release() {
   case "$1" in
-@APT_INSTALL_CASES@
-@DNF_INSTALL_CASES@
-@PACMAN_INSTALL_CASES@
+@INSTALL_CASES@
     *) _error "unsupported release '$1'" ;;
   esac
 }
@@ -130,7 +122,7 @@ _get_release() {
 
   codename="${VERSION_CODENAME:-}"
   case " $SUPPORTED " in
-    *" $codename "*) printf '%s\n' "$codename"; return ;;
+    *" $codename "*) [ -n "$codename" ] && { printf '%s\n' "$codename"; return; } ;;
   esac
 
   printf "error: unsupported release '%s', install manually\n\nsupported:\n  %s\n" \

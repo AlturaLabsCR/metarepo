@@ -13,13 +13,10 @@ python3Packages.buildPythonApplication {
     homepage = "https://example.org/";
     license = lib.licenses.mit;
     mainProgram = "metarepo-hello-python";
-    platforms = [
-      "x86_64-linux"
-      "aarch64-linux"
-    ];
+    platforms = import ./systems.nix;
   };
   passthru.packageArchitectures = {
-    deb = "all";
+    apt = "all";
     dnf = "noarch";
     pacman = "any";
   };

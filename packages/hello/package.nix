@@ -26,21 +26,18 @@ stdenv.mkDerivation {
     homepage = "https://example.org/";
     license = lib.licenses.mit;
     mainProgram = "metarepo-hello-c";
-    platforms = [
-      "x86_64-linux"
-      "aarch64-linux"
-    ];
+    platforms = import ./systems.nix;
   };
   passthru.packageArchitectures =
     if stdenv.hostPlatform.system == "aarch64-linux" then
       {
-        deb = "arm64";
+        apt = "arm64";
         dnf = "aarch64";
         pacman = "aarch64";
       }
     else if stdenv.hostPlatform.system == "x86_64-linux" then
       {
-        deb = "amd64";
+        apt = "amd64";
         dnf = "x86_64";
         pacman = "x86_64";
       }

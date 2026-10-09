@@ -1,6 +1,12 @@
 # Metarepo
 
-Template for building universal package repositories.
+Reusable Nix library and project template for building APT, DNF and Pacman
+package repositories.
+
+Use `lib.mkPackages` to export packages and the repository builder from another
+flake, or `lib.forPkgs` for individual native package builders. See
+[the library API and template guide](doc/library.md). Platforms and distribution aliases live
+in `packages/`; adding packages or releases requires no changes elsewhere.
 
 The example packages are `metarepo-hello-c` and `metarepo-hello-python`.
 
@@ -8,6 +14,8 @@ The example packages are `metarepo-hello-c` and `metarepo-hello-python`.
 
 ```sh
 nix flake show
+nix run .#hello
+nix profile add .#hello
 nix run .#build-public
 ```
 
