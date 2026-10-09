@@ -6,19 +6,15 @@
 }:
 { publications, repository }:
 let
-  channelNames = lib.unique (
-    lib.concatMap (publication: builtins.attrNames publication.channels) publications
-  );
+  channelNames = builtins.attrNames repository.channels;
   channel =
     name:
     let
       entries = map (publication: publication.channels.${name}) (
         lib.filter (publication: builtins.hasAttr name publication.channels) publications
       );
-      formats = map (entry: entry.format or entry.package.passthru.metarepo.format) entries;
-      format = builtins.head formats;
+      format = repository.channels.${name}.format;
     in
-    assert lib.all (candidate: candidate == format) formats;
     assert builtins.elem format [
       "apt"
       "dnf"
@@ -26,7 +22,7 @@ let
     ];
     {
       inherit format;
-      releases = lib.unique (lib.concatMap (entry: entry.releases or [ ]) entries);
+      releases = repository.channels.${name}.releases or [ ];
       packages = map (entry: entry.package) entries;
       architectures = map (
         entry: entry.architecture or entry.package.passthru.metarepo.architecture
@@ -89,6 +85,7 @@ let
 in
 assert lib.assertMsg (lib.all validToken (
   channelNames
+  ++ lib.concatMap (name: channels.${name}.releases) channelNames
   ++ supportedReleases
   ++ lib.concatMap (name: channels.${name}.architectures) channelNames
   ++ [ repository.id ]

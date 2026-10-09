@@ -1,8 +1,9 @@
 # Use Metarepo as a library
 
 Add Metarepo as a flake input. Your project owns `packages/` and the repository
-identity in `repository.nix`; you do not need to copy or edit `lib/`. Package
-platforms, native builds, channels and release aliases live in `packages/`.
+identity and channel/release configuration in `repository.nix`; you do not
+need to copy or edit `lib/`. Package platforms and native builds live in
+`packages/`.
 
 ```nix
 {
@@ -53,7 +54,6 @@ them directly:
     format = "apt";
     architecture = "amd64";
     package = customDeb; # A derivation containing valid .deb package files.
-    releases = [ "ubuntu2404" ];
   };
 }
 ```
@@ -73,23 +73,23 @@ A package without `public.nix` remains usable through Nix.
   origin = "My Project";
   label = "My Project packages";
   url = "https://packages.example.org";
+  channels.stable = { format = "apt"; releases = [ "ubuntu2404" ]; };
 }
 ```
 
-This file contains only repository identity and hosting information. Package
-support belongs entirely in `packages/<name>/public.nix`, for example:
+This file contains repository identity, hosting information, and supported
+channels. A package subscribes by providing its artifact for a channel in
+`packages/<name>/public.nix`, for example:
 
 ```nix
 channels.stable = {
   package = apt;
-  releases = [ "ubuntu2404" ];
 };
 ```
 
-After evaluating the packages available for a system, `mkPublic` groups their
-channels and combines their `releases` aliases, removing duplicates. Removing a
-package also removes aliases contributed only by that package. No global
-channel or release registry is needed.
+`mkPublic` groups artifacts by channel. A channel without artifacts is omitted
+from publication and installer detection. Add distribution support by updating
+the channel's `releases` list in `repository.nix`.
 
 Detection first tries `ID + VERSION_ID` from `os-release`, removing dots, then
 `VERSION_CODENAME`. Channel names are also accepted during detection. An alias

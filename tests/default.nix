@@ -15,25 +15,24 @@ let
     origin = "Test";
     label = "Test's repository";
     url = "https://example.invalid/packages";
+    channels = {
+      stable = { format = "apt"; releases = [ "example42" "another1" ]; };
+      next = { format = "dnf"; releases = [ "example43" ]; };
+      rolling = { format = "pacman"; releases = [ "custom" ]; };
+    };
   };
   publications = [
     {
       channels = {
         stable = {
-          releases = [ "example42" ];
-          format = "apt";
           architecture = "all";
           package = pkgs.emptyDirectory;
         };
         next = {
-          releases = [ "example43" ];
-          format = "dnf";
           architecture = "aarch64";
           package = pkgs.emptyDirectory;
         };
         rolling = {
-          releases = [ "custom" ];
-          format = "pacman";
           architecture = "any";
           package = pkgs.emptyDirectory;
         };
@@ -41,13 +40,8 @@ let
     }
     {
       channels.stable = {
-        format = "apt";
         architecture = "all";
         package = pkgs.emptyDirectory;
-        releases = [
-          "example42"
-          "another1"
-        ];
       };
     }
   ];
@@ -56,12 +50,12 @@ let
     releases:
     builtins.tryEval
       (api.mkPublic {
-        inherit repository;
-        publications = map (publication: {
+        publications = publications;
+        repository = repository // {
           channels = pkgs.lib.mapAttrs (
             name: channel: channel // { releases = releases.${name} or [ ]; }
-          ) publication.channels;
-        }) publications;
+          ) repository.channels;
+        };
       }).drvPath;
 in
 assert empty == { };
