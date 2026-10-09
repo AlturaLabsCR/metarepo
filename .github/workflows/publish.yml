@@ -44,12 +44,12 @@ jobs:
 
       - run: nix run .#build-public
 
-      - uses: actions/upload-pages-artifact@v4
+      - uses: actions/upload-pages-artifact@v5
         with:
           name: metarepo-pages
           path: public
 
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
         with:
           artifact_name: metarepo-pages
