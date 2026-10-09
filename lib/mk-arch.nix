@@ -25,6 +25,7 @@
   homepage,
   license,
   depends,
+  maintainer,
   release ? "1",
 }:
 let
@@ -53,7 +54,7 @@ let
     PKGEXT='.pkg.tar.zst'
     SRCDEST="$PWD/src"
     LOGDEST="$PWD/log"
-    PACKAGER="Metarepo <packages@example.invalid>"
+    PACKAGER=${lib.escapeShellArg maintainer}
     GPGKEY=""
   '';
   pacmanConf = writeText "pacman.conf" ''

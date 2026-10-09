@@ -13,6 +13,7 @@
   homepage,
   license,
   depends,
+  maintainer,
   release ? "1",
 }:
 let
@@ -23,6 +24,7 @@ let
     Summary: ${description}
     License: ${license}
     URL: ${homepage}
+    Packager: ${maintainer}
     BuildArch: ${architecture}
     AutoReqProv: no
     ${lib.concatMapStringsSep "\n" (dep: "Requires: ${dep}") depends}

@@ -17,13 +17,13 @@ let
     inherit (package) version;
     inherit (package.meta) description homepage;
     license = package.meta.license.spdxId;
+    maintainer = "Hello Example Authors <hello@example.invalid>";
   };
   deb = callPackage ../../lib/mk-deb.nix { } (
     common
     // {
       architecture = package.passthru.packageArchitectures.deb;
       depends = [ ];
-      maintainer = "Hello Example Authors <hello@example.invalid>";
     }
   );
   dnf = callPackage ../../lib/mk-rpm.nix { } (
