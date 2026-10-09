@@ -6,11 +6,22 @@
 }:
 { publications, repository }:
 let
+  normalizeEntry = channelName: entry:
+    if builtins.isAttrs entry && entry ? package then
+      entry
+    else if builtins.isAttrs entry && entry ? passthru && entry.passthru ? metarepo then
+      {
+        package = entry;
+        format = entry.passthru.metarepo.format;
+        architecture = entry.passthru.metarepo.architecture;
+      }
+    else
+      throw "metarepo: publication for channel '${channelName}' must be a package derivation with passthru.metarepo format and architecture, or a record with package";
   configuredChannelNames = builtins.attrNames repository.channels;
   channel =
     name:
     let
-      entries = map (publication: publication.channels.${name}) (
+      entries = map (publication: normalizeEntry name publication.channels.${name}) (
         lib.filter (publication: builtins.hasAttr name publication.channels) publications
       );
       format = repository.channels.${name}.format;
@@ -24,6 +35,7 @@ let
       inherit format;
       releases = repository.channels.${name}.releases or [ ];
       packages = map (entry: entry.package) entries;
+      entryFormats = map (entry: entry.format or entry.package.passthru.metarepo.format) entries;
       architectures = map (
         entry: entry.architecture or entry.package.passthru.metarepo.architecture
       ) entries;
@@ -86,6 +98,8 @@ let
     pacman = repositoriesOf "pacman";
   };
 in
+assert lib.assertMsg (lib.all (name: lib.all (entryFormat: entryFormat == configuredChannels.${name}.format) configuredChannels.${name}.entryFormats) configuredChannelNames)
+  "metarepo: publication package format does not match its configured channel format";
 assert lib.assertMsg (lib.all validToken (
   channelNames
   ++ lib.concatMap (name: configuredChannels.${name}.releases) configuredChannelNames

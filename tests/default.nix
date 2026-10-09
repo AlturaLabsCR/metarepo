@@ -45,7 +45,17 @@ let
       };
     }
   ];
+  directPublications = [
+    {
+      channels = {
+        stable = pkgs.emptyDirectory // { passthru = { metarepo = { format = "apt"; architecture = "all"; }; }; };
+        next = pkgs.emptyDirectory // { passthru = { metarepo = { format = "dnf"; architecture = "aarch64"; }; }; };
+        rolling = pkgs.emptyDirectory // { passthru = { metarepo = { format = "pacman"; architecture = "any"; }; }; };
+      };
+    }
+  ];
   public = api.mkPublic { inherit repository publications; };
+  directPublic = api.mkPublic { repository; publications = directPublications; };
   invalid =
     releases:
     builtins.tryEval
@@ -74,6 +84,9 @@ assert
     next = [ "duplicate" ];
   }).success;
 assert !(invalid { stable = [ "bad|selector" ]; }).success;
+assert directPublic.repositories.apt.architecturesBySuite.stable == [ "all" ];
+assert directPublic.repositories.dnf == [ "next" ];
+assert directPublic.repositories.pacman == [ "rolling" ];
 {
   installer = pkgs.runCommand "installer-tests" { } ''
         sh -n ${public.installScript}
