@@ -70,3 +70,20 @@ Then install the packages:
 ```sh
 sudo pacman -Sy metarepo-hello-c metarepo-hello-python
 ```
+
+## Nix
+
+The flake also exposes the example packages directly. Install either package
+into your Nix profile:
+
+```sh
+nix profile install github:AlturaLabsCR/metarepo#hello
+nix profile install github:AlturaLabsCR/metarepo#hello-python
+```
+
+Or run a package without adding it to the profile:
+
+```sh
+nix run github:AlturaLabsCR/metarepo#hello
+nix run github:AlturaLabsCR/metarepo#hello-python
+```
