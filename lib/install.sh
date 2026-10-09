@@ -35,6 +35,9 @@ _check_architecture() {
 _install_apt() {
   suite="$1"
   architecture="$(dpkg --print-architecture)"
+  if [ "$APT_ARCHITECTURES" = all ]; then
+    architecture=all
+  fi
   _check_architecture "$APT_ARCHITECTURES" "$architecture"
 
   install -d -m 0755 /usr/share/keyrings

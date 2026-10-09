@@ -30,16 +30,10 @@ let
   channels = lib.genAttrs channelNames channel;
   repositoriesOf = format: lib.filter (name: channels.${name}.format == format) channelNames;
   aptSuites = repositoriesOf "apt";
-  packageAptArchitectures = lib.unique (
-    lib.concatMap (
-      suite: lib.filter (architecture: architecture != "all") channels.${suite}.architectures
-    ) aptSuites
-  );
-  aptArchitectures =
-    if packageAptArchitectures == [ ] then repository.aptArchitectures else packageAptArchitectures;
   repositoryArchitectures = names: lib.unique (
     lib.concatMap (name: channels.${name}.architectures) names
   );
+  aptArchitectures = repositoryArchitectures aptSuites;
   dnfArchitectures = repositoryArchitectures repositories.dnf;
   pacmanArchitectures = repositoryArchitectures repositories.pacman;
   aptReleaseMappings = [
