@@ -6,7 +6,7 @@ replace `https://packages.example.org/metarepo` below with the `url` from
 `repository.nix`. These examples assume repository signing is enabled and the
 published key is `metarepo.asc`.
 
-## Ubuntu and Debian
+## Ubuntu (`apt`)
 
 Use a suite published by the repository, such as `noble` or `jammy`. Change
 `amd64` to `arm64` when that architecture is published.
@@ -21,7 +21,7 @@ sudo apt update
 sudo apt install metarepo-hello-c metarepo-hello-python
 ```
 
-## Fedora and DNF
+## Fedora (`dnf`)
 
 Create `/etc/yum.repos.d/metarepo.repo`:
 
@@ -42,7 +42,7 @@ Then install the packages:
 sudo dnf install metarepo-hello-c metarepo-hello-python
 ```
 
-## Arch Linux and Pacman
+## Arch Linux (`pacman`)
 
 Download and verify the key fingerprint before trusting it:
 
