@@ -40,12 +40,32 @@ An empty packages directory produces `{ }`. `build-public` is only exported
 on systems with at least one `public.nix`, and that name is reserved.
 
 An optional `public.nix` receives `package` and `metarepo`, alongside normal
-`callPackage` dependencies. It returns `{ channels = { ... }; }`. Each channel
-has a `package` derivation created by `mkApt`, `mkDnf`, or `mkPacman`, and
-optional `releases`. The builder records its format and architecture on the
-derivation, so the channel does not repeat them. Custom derivations can set
-`passthru.metarepo = { format = "apt"; architecture = "amd64"; };`. See the [C example](../packages/hello/public.nix)
-and [Python example](../packages/hello-python/public.nix).
+`callPackage` dependencies. Its only required interface is the returned
+`{ channels = { ... }; }` set. The `mkApt`, `mkDnf`, and `mkPacman` builders are
+conveniences; a package can instead build archives however it needs and declare
+them directly:
+
+```nix
+let
+  customDeb = pkgs.runCommand "custom-deb" { } ''
+    # Build an archive with the project's preferred tools.
+    touch "$out"
+  '';
+in {
+  channels.stable = {
+    format = "apt";
+    architecture = "amd64";
+    package = customDeb;
+    releases = [ "ubuntu2404" ];
+  };
+}
+```
+
+When using a Metarepo builder, the channel can omit `format` and `architecture`;
+the builder records them on its derivation. Custom derivations can either
+provide the same `passthru.metarepo` metadata or declare those fields on the
+channel as above. The C and Python packages show the convenience pattern; each
+package owns its `public.nix` and can replace it with its own composition.
 A package without `public.nix` remains usable through Nix.
 
 ## Project configuration

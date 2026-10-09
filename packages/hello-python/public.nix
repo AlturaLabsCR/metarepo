@@ -1,4 +1,5 @@
 {
+  lib,
   metarepo,
   runCommand,
   package,
@@ -20,33 +21,32 @@ let
     license = package.meta.license.spdxId;
     maintainer = "Hello Python Authors <hello-python@example.invalid>";
   };
-  apt = metarepo.mkApt (
-    common
-    // {
-      architecture = package.passthru.packageArchitectures.apt;
-      depends = [ "python3" ];
-    }
-  );
-  dnf = metarepo.mkDnf (
-    common
-    // {
-      architecture = package.passthru.packageArchitectures.dnf;
-      depends = [ "python3" ];
-    }
-  );
-  pacman = metarepo.mkPacman (
-    common
-    // {
-      architecture = package.passthru.packageArchitectures.pacman;
-      depends = [ "python" ];
-    }
-  );
+  builders = {
+    apt = metarepo.mkApt;
+    dnf = metarepo.mkDnf;
+    pacman = metarepo.mkPacman;
+  };
+  dependencies = {
+    apt = [ "python3" ];
+    dnf = [ "python3" ];
+    pacman = [ "python" ];
+  };
+  packages = lib.mapAttrs (
+    format: builder:
+    builder (
+      common
+      // {
+        architecture = package.passthru.packageArchitectures.${format};
+        depends = dependencies.${format};
+      }
+    )
+  ) builders;
 in
 {
   channels = {
     jammy = {
       releases = [ "ubuntu2204" ];
-      package = apt;
+      package = packages.apt;
     };
     noble = {
       releases = [
@@ -55,15 +55,15 @@ in
         "debian13"
         "linuxmint7"
       ];
-      package = apt;
+      package = packages.apt;
     };
     fedora = {
       releases = [ "fedora44" ];
-      package = dnf;
+      package = packages.dnf;
     };
     arch = {
       releases = [ "arch" ];
-      package = pacman;
+      package = packages.pacman;
     };
   };
 }
