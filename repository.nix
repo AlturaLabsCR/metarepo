@@ -2,5 +2,5 @@
   id = "metarepo";
   origin = "Metarepo";
   label = "Metarepo Linux packages";
-  url = "https://packages.example.org/metarepo";
+  url = "https://alturalabscr.github.io/metarepo";
 }
