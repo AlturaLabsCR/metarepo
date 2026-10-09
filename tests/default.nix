@@ -55,7 +55,7 @@ let
     }
   ];
   public = api.mkPublic { inherit repository publications; };
-  directPublic = api.mkPublic { repository; publications = directPublications; };
+  directPublic = api.mkPublic { inherit repository; publications = directPublications; };
   invalid =
     releases:
     builtins.tryEval
