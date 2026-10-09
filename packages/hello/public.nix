@@ -1,5 +1,4 @@
 {
-  lib,
   metarepo,
   runCommand,
   package,
@@ -20,38 +19,22 @@ let
     license = package.meta.license.spdxId;
     maintainer = "Hello Example Authors <hello@example.invalid>";
   };
-  builders = {
-    apt = metarepo.mkApt;
-    dnf = metarepo.mkDnf;
-    pacman = metarepo.mkPacman;
-  };
-  dependencies = {
-    apt = [ ];
-    dnf = [ ];
-    pacman = [ ];
-  };
-  recommendations = {
-    apt = [ ];
-    dnf = [ ];
-    pacman = [ ];
-  };
-  packages = lib.mapAttrs (
-    format: builder:
-    builder (
-      common
-      // {
-        architecture = package.passthru.packageArchitectures.${format};
-        depends = dependencies.${format};
-        recommends = recommendations.${format};
-      }
-    )
-  ) builders;
+  architectures = package.passthru.packageArchitectures;
+  apt = metarepo.mkApt (common // {
+    architecture = architectures.apt;
+  });
+  dnf = metarepo.mkDnf (common // {
+    architecture = architectures.dnf;
+  });
+  pacman = metarepo.mkPacman (common // {
+    architecture = architectures.pacman;
+  });
 in
 {
   channels = {
-    jammy.package = packages.apt;
-    noble.package = packages.apt;
-    fedora.package = packages.dnf;
-    arch.package = packages.pacman;
+    jammy = apt;
+    noble = apt;
+    fedora = dnf;
+    arch = pacman;
   };
 }

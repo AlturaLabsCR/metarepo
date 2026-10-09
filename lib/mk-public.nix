@@ -35,7 +35,7 @@ let
       inherit format;
       releases = repository.channels.${name}.releases or [ ];
       packages = map (entry: entry.package) entries;
-      entryFormats = map (entry: entry.format or entry.package.passthru.metarepo.format) entries;
+      entryFormats = map (entry: entry.format or (entry.package.passthru.metarepo.format or format)) entries;
       architectures = map (
         entry: entry.architecture or entry.package.passthru.metarepo.architecture
       ) entries;

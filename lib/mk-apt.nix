@@ -12,7 +12,7 @@
   description,
   homepage,
   maintainer,
-  depends,
+  depends ? [ ],
   license,
   recommends ? [ ],
   release ? "1",

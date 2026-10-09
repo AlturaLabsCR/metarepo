@@ -51,7 +51,6 @@ them directly:
 { customDeb }:
 {
   channels.stable = {
-    format = "apt";
     architecture = "amd64";
     package = customDeb; # A derivation containing valid .deb package files.
   };
@@ -60,9 +59,11 @@ them directly:
 
 When using a Metarepo builder, the channel can omit `format` and `architecture`;
 the builder records them on its derivation. Custom derivations can either
-provide the same `passthru.metarepo` metadata or declare those fields on the
-channel as above. The C and Python packages show the convenience pattern; each
-package owns its `public.nix` and can replace it with its own composition.
+provide the same `passthru.metarepo` metadata or declare `architecture` on the
+channel as above. The format defaults to the configured channel format; an
+explicit format or builder metadata must match it. The C and Python packages
+show the convenience pattern; each package owns its `public.nix` and can replace
+it with its own composition.
 A package without `public.nix` remains usable through Nix.
 
 ## Project configuration
@@ -82,9 +83,7 @@ channels. A package subscribes by providing its artifact for a channel in
 `packages/<name>/public.nix`, for example:
 
 ```nix
-channels.stable = {
-  package = apt;
-};
+channels.stable = apt;
 ```
 
 `mkPublic` groups artifacts by channel. A channel without artifacts is omitted
@@ -113,8 +112,9 @@ code.
 For projects with a different layout, use `metarepo.lib.forPkgs pkgs`. It exposes:
 
 - `mkApt`, `mkDnf`, `mkPacman`: functions taking `name`, `version`, `payload`,
-  `architecture`, `description`, `homepage`, `maintainer`, `depends`, `license`,
-  optional `recommends` (default `[]`), and optional `release` (default `"1"`).
+  `architecture`, `description`, `homepage`, `maintainer`, `license`,
+  optional `depends` and `recommends` (both default to `[]`), and optional
+  `release` (default `"1"`).
   `recommends` maps to APT `Recommends`, RPM `Recommends`, and pacman
   `optdepends`. `payload` is a derivation with a native
   filesystem tree such as `usr/bin/`, not a Nix store closure.
@@ -124,8 +124,10 @@ For projects with a different layout, use `metarepo.lib.forPkgs pkgs`. It expose
   Its `installScript` attribute contains the generated installer.
 
 No directory discovery is required by these builders. Custom package derivations
-can provide `passthru.metarepo` metadata for `mkPublic`, or set `format` and
-`architecture` explicitly in a channel entry.
+can provide `passthru.metarepo` metadata for `mkPublic`, or set `architecture`
+explicitly in a channel entry.
+A builder derivation can be assigned directly: `channels.stable = apt;`.
+The record form, `channels.stable = { package = apt; };`, is also supported.
 
 ## Use this repository as a template
 
