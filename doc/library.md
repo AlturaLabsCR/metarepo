@@ -1,7 +1,8 @@
 # Use Metarepo as a library
 
-Add Metarepo as a flake input. Your project owns `packages/`, `repository.nix`
-and each package’s supported systems; you do not need to copy or edit `lib/`.
+Add Metarepo as a flake input. Your project owns `packages/` and the repository
+identity in `repository.nix`; you do not need to copy or edit `lib/`. Package
+platforms, native builds, channels and release aliases live in `packages/`.
 
 ```nix
 {
@@ -46,16 +47,12 @@ conveniences; a package can instead build archives however it needs and declare
 them directly:
 
 ```nix
-let
-  customDeb = pkgs.runCommand "custom-deb" { } ''
-    # Build an archive with the project's preferred tools.
-    touch "$out"
-  '';
-in {
+{ customDeb }:
+{
   channels.stable = {
     format = "apt";
     architecture = "amd64";
-    package = customDeb;
+    package = customDeb; # A derivation containing valid .deb package files.
     releases = [ "ubuntu2404" ];
   };
 }
@@ -107,8 +104,9 @@ APT metadata also uses each suite's own architectures. There are no distribution
 version defaults in the library. Associations declare compatibility; they do
 not rebuild a payload against that distribution's libraries or prove ABI
 compatibility. The native payload and dependencies remain the project's
-responsibility. Adding a distribution using an existing format only requires
-project configuration; supporting a new package format requires library code.
+responsibility. Add distribution support for an existing format in the relevant
+`packages/<name>/public.nix`; supporting a new package format requires library
+code.
 
 ## Lower-level builders
 
@@ -130,10 +128,11 @@ can provide `passthru.metarepo` metadata for `mkPublic`, or set `format` and
 ## Use this repository as a template
 
 Copy or fork this repository, replace the example packages, edit
-`repository.nix`, and declare platforms in each package’s `systems.nix`. The same
-library API is used by the template itself. To maintain the library separately, use the input-based
-flake above and retain only your project configuration, packages and publishing
-workflow. The input URL must reference a revision containing this API.
+`repository.nix`, and declare platforms in each package’s `systems.nix`. The
+same library API is used by the template itself. To maintain the library
+separately, use the input-based flake above and retain your project
+configuration, packages and publishing workflow. The input URL must reference a
+revision containing this API.
 
 Both approaches preserve:
 
