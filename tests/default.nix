@@ -90,6 +90,12 @@ assert !(builtins.tryEval (api.mkPublic {
   publications = [ { channels.stable = (builtins.head directPublications).channels.next; } ];
 }).drvPath).success;
 {
+  apt-multiversion = pkgs.runCommand "apt-multiversion-tests" {
+    nativeBuildInputs = [ pkgs.dpkg pkgs.apt pkgs.gzip ];
+  } ''
+    sh ${./apt-multiversion.sh} ${../lib/repository.sh}
+    touch "$out"
+  '';
   native-packages =
     let
       common = {

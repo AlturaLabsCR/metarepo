@@ -43,7 +43,22 @@ for suite in $APT_SUITES; do
     for arch in $architectures; do
       index="$release/main/binary-$arch/Packages"
       mkdir -p "$(dirname "$index")"
-      dpkg-scanpackages --arch "$arch" pool/main > "$index"
+      versions="$(
+        for package in pool/main/*.deb; do
+          case "$package" in
+            *_"$arch".deb|*_all.deb)
+              dpkg-deb --show --showformat='${Package} ${Version}\n' "$package" || exit 1
+              ;;
+          esac
+        done
+      )"
+      # Count distinct versions, not repeated copies of the same version.
+      multiple_versions="$(printf '%s\n' "$versions" | sort -u | cut -d ' ' -f 1 | uniq -d)"
+      set -- --arch "$arch"
+      if [ -n "$multiple_versions" ]; then
+        set -- "$@" --multiversion
+      fi
+      dpkg-scanpackages "$@" pool/main > "$index"
       gzip -n -9 -c "$index" > "$index.gz"
     done
     apt-ftparchive \
