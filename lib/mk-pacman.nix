@@ -46,6 +46,9 @@ let
     package() {
       mkdir -p "$pkgdir"
       cp -R ${payload}/. "$pkgdir/"
+      # Nix store directories are read-only; restore owner write permission
+      # in the staging tree before makepkg records the package's modes.
+      find "$pkgdir" -type d -exec chmod u+w {} +
     }
   '';
   makepkgConf = writeText "makepkg.conf" ''
