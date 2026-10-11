@@ -95,7 +95,7 @@ let
         ${script}
       fi
     '';
-  reload = running "systemctl daemon-reload";
+  reload = running "systemctl daemon-reload || true";
   enable = command helper "enable" (selected "enable");
   start = running (command invoke "start" (selected "start"));
   restart = running (
