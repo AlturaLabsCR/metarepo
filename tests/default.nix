@@ -98,6 +98,7 @@ assert !(builtins.tryEval (api.mkPublic {
     touch "$out"
   '';
   integrations = import ./integrations.nix { inherit pkgs; };
+  fastfetch = import ./fastfetch.nix { inherit pkgs api; };
   native-packages = import ./native-packages.nix { inherit pkgs api; };
   installer = pkgs.runCommand "installer-tests" { } ''
         sh -n ${public.installScript}
