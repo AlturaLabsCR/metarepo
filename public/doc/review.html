@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Metarepo: review</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <nav aria-label="Documentation">
+    <a href="index.html">API</a> · <a href="library.html">Library guide</a> ·
+    <a href="install.html">Installation</a> · <a href="review.html">Review</a>
+  </nav>
+  <nav aria-label="Contents"><ul>
+<li><a href="#revisión-de-mantenibilidad"
+id="toc-revisión-de-mantenibilidad">Revisión de mantenibilidad</a>
+<ul>
+<li><a href="#mejoras-aplicadas" id="toc-mejoras-aplicadas">Mejoras
+aplicadas</a></li>
+<li><a href="#recomendaciones-pendientes"
+id="toc-recomendaciones-pendientes">Recomendaciones pendientes</a></li>
+</ul></li>
+</ul></nav>
+  <main><h1 id="revisión-de-mantenibilidad">Revisión de
+mantenibilidad</h1>
+<h2 id="mejoras-aplicadas">Mejoras aplicadas</h2>
+<ul>
+<li>Separar el descubrimiento de paquetes en
+<code>lib/mk-packages.nix</code>. <code>lib/default.nix</code> concentra
+la API y el enlace con Nixpkgs; los builders conservan sus módulos.</li>
+<li>Compartir el ámbito base de <code>callPackage</code> al descubrir
+paquetes y publicaciones, conservando la inyección selectiva de
+dependencias de cada función.</li>
+<li>Rechazar canales desconocidos en publicaciones para evitar que un
+error de escritura omita paquetes silenciosamente. Explicar también los
+formatos inválidos.</li>
+<li>Documentar todas las funciones públicas y los tres helpers internos
+con comentarios <code>/** … */</code>, tipos, entradas, valores
+predeterminados y ejemplos.</li>
+<li>Generar la referencia JSON, Markdown y HTML mediante nixdoc y
+publicarla junto con el repositorio. El constructor vuelve a incluirla
+al reemplazar <code>public/</code>.</li>
+<li>Exponer <code>formatter</code> con nixfmt y aplicar un formato
+uniforme a los archivos Nix.</li>
+</ul>
+<h2 id="recomendaciones-pendientes">Recomendaciones pendientes</h2>
+<ol type="1">
+<li>Añadir pruebas de instalación y actualización en contenedores de las
+distribuciones declaradas cuando se amplíe el catálogo. Las pruebas
+actuales verifican artefactos y hooks, pero no demuestran compatibilidad
+con cada alias.</li>
+<li>Probar el flujo de firma completo con una clave efímera: exportación
+de la clave, firmas de paquetes e índices y verificación desde los
+clientes. Resulta especialmente útil antes de depender de firmas en
+producción.</li>
+<li>Si aparecen más ejemplos del mismo upstream, compartir sus recetas
+de descarga. Los dos ejemplos Fastfetch repiten un bloque pequeño;
+extraerlo ahora añadiría un módulo y parámetros sin una mejora
+suficiente.</li>
+<li>Centralizar metadatos comunes de formatos solamente cuando se añada
+un formato nuevo o haya cambios frecuentes en sus convenciones. La
+selección actual es pequeña y mantener cada builder explícito facilita
+leer su comportamiento.</li>
+</ol>
+<p>La prioridad es reducir duplicación con significado y conservar
+límites claros. La documentación y el formato pueden aumentar el número
+de líneas sin aumentar la complejidad de la implementación.</p></main>
+</body>
+</html>

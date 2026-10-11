@@ -1,4 +1,8 @@
-{ metarepo, repository, package }:
+{
+  metarepo,
+  repository,
+  package,
+}:
 metarepo.mkPublication {
   inherit repository package;
   payload = package: metarepo.mkPayload { inherit package; };

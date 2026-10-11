@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="$lang$">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>$pagetitle$</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <nav aria-label="Documentation">
+    <a href="index.html">API</a> · <a href="library.html">Library guide</a> ·
+    <a href="install.html">Installation</a> · <a href="review.html">Review</a>
+  </nav>
+  $if(toc)$<nav aria-label="Contents">$table-of-contents$</nav>$endif$
+  <main>$body$</main>
+</body>
+</html>

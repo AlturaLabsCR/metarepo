@@ -1,0 +1,7 @@
+html { color-scheme: light dark; }
+body { max-width: 72rem; margin: 2rem auto; padding: 0 1.5rem; line-height: 1.6; font-family: system-ui, sans-serif; }
+a { color: light-dark(#1858a8, #9bc5ff); }
+pre { padding: 1rem; overflow-x: auto; background: light-dark(#f2f4f7, #20252b); }
+code { font-family: ui-monospace, monospace; }
+dt { font-weight: bold; margin-top: 1rem; }
+h2 { margin-top: 3rem; border-bottom: 1px solid #888; }

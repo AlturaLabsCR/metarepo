@@ -1,12 +1,68 @@
+/**
+  Assemble native artifacts into an unsigned repository and generate its installer.
+  Configured channels without artifacts are omitted. Unknown publication channels,
+  mismatched formats, unsafe tokens and ambiguous release selectors are rejected.
+
+  Return a repository derivation. Its `builder` is an executable that replaces
+  `public/` in the working directory and optionally signs using `GPG_KEY_ID`
+  from the environment or `.env`. Its `installScript` is the generated installer.
+
+  # Type
+
+  ```
+  mkPublic :: AttrSet -> Derivation
+  ```
+
+  # Inputs
+
+  `publications`
+  : List of `mkPublication` results. Each `channels.<name>` accepts one
+    artifact or a list. Artifacts need `passthru.metarepo.format` and
+    `architecture`, or a record `{ package; architecture; format; }`.
+    Record metadata can fall back to the package's metadata; record `format`
+    ultimately defaults to the configured channel format.
+
+  `repository`
+  : Attribute set with `id`, `origin`, `label`, `url` and `channels`.
+    Each channel specifies `format` (`apt`, `dnf` or `pacman`) and optional
+    `releases` (installer aliases, default `[ ]`). The installer also accepts
+    channel names. IDs, published channels, release aliases and architectures
+    must match `[a-zA-Z0-9][a-zA-Z0-9_+-]*`.
+
+  `documentation`
+  : Optional directory copied under `public/doc`; defaults to `null`.
+    When supplied, the channel name `doc` is reserved.
+
+  # Examples
+
+  ```nix
+  public = metarepo.mkPublic {
+    publications = [ publication ];
+    repository = {
+      id = "example";
+      origin = "Example";
+      label = "Example packages";
+      url = "https://packages.example.org";
+      channels.stable = { format = "apt"; releases = [ "ubuntu2404" ]; };
+    };
+  };
+  # public.builder generates public/; public itself is an unsigned Nix output.
+  ```
+*/
 {
   lib,
   callPackage,
   runCommand,
   writeText,
 }:
-{ publications, repository }:
+{
+  publications,
+  repository,
+  documentation ? null,
+}:
 let
-  normalizeEntry = channelName: entry:
+  normalizeEntry =
+    channelName: entry:
     if builtins.isAttrs entry && entry ? package then
       entry
     else if builtins.isAttrs entry && entry ? passthru && entry.passthru ? metarepo then
@@ -18,24 +74,29 @@ let
     else
       throw "metarepo: publication for channel '${channelName}' must be a package derivation with passthru.metarepo format and architecture, or a record with package";
   configuredChannelNames = builtins.attrNames repository.channels;
+  unknownChannels = lib.subtractLists configuredChannelNames (
+    lib.unique (lib.concatMap (publication: builtins.attrNames publication.channels) publications)
+  );
   channel =
     name:
     let
-      entries = lib.concatMap (publication: map (normalizeEntry name) (lib.toList publication.channels.${name})) (
-        lib.filter (publication: builtins.hasAttr name publication.channels) publications
-      );
+      entries = lib.concatMap (
+        publication: map (normalizeEntry name) (lib.toList publication.channels.${name})
+      ) (lib.filter (publication: builtins.hasAttr name publication.channels) publications);
       format = repository.channels.${name}.format;
     in
-    assert builtins.elem format [
+    assert lib.assertMsg (builtins.elem format [
       "apt"
       "dnf"
       "pacman"
-    ];
+    ]) "metarepo: unsupported format '${format}' for channel '${name}'";
     {
       inherit format;
       releases = repository.channels.${name}.releases or [ ];
       packages = map (entry: entry.package) entries;
-      entryFormats = map (entry: entry.format or (entry.package.passthru.metarepo.format or format)) entries;
+      entryFormats = map (
+        entry: entry.format or (entry.package.passthru.metarepo.format or format)
+      ) entries;
       architectures = map (
         entry: entry.architecture or entry.package.passthru.metarepo.architecture
       ) entries;
@@ -87,6 +148,9 @@ let
     '') channelNames}
     cp ${installScript} "$out/install.sh"
     chmod 644 "$out/install.sh"
+    ${lib.optionalString (documentation != null) ''
+      cp -R ${lib.escapeShellArg (toString documentation)} "$out/doc"
+    ''}
   '';
   repositories = {
     apt = {
@@ -98,8 +162,21 @@ let
     pacman = repositoriesOf "pacman";
   };
 in
-assert lib.assertMsg (lib.all (name: lib.all (entryFormat: entryFormat == configuredChannels.${name}.format) configuredChannels.${name}.entryFormats) configuredChannelNames)
-  "metarepo: publication package format does not match its configured channel format";
+assert lib.assertMsg (
+  unknownChannels == [ ]
+) "metarepo: publications reference unknown channels: ${lib.concatStringsSep ", " unknownChannels}";
+assert lib.assertMsg (
+  documentation == null || !(repository.channels ? doc)
+) "metarepo: channel 'doc' conflicts with the documentation directory";
+assert lib.assertMsg (lib.all
+  (
+    name:
+    lib.all (
+      entryFormat: entryFormat == configuredChannels.${name}.format
+    ) configuredChannels.${name}.entryFormats
+  )
+  configuredChannelNames
+) "metarepo: publication package format does not match its configured channel format";
 assert lib.assertMsg (lib.all validToken (
   channelNames
   ++ lib.concatMap (name: configuredChannels.${name}.releases) configuredChannelNames

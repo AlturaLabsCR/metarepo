@@ -1,3 +1,36 @@
+/**
+  Internal repository builder used by `mkPublic`.
+  Generate APT indexes, RPM metadata and Pacman databases from staged artifacts.
+
+  # Type
+
+  ```
+  mkRepository :: AttrSet -> Derivation
+  ```
+
+  # Inputs
+
+  `packages`
+  : Directory containing per-channel artifacts and an `install.sh`.
+
+  `repositories`
+  : APT configuration (`suites`, fallback `architectures`, optional
+    `architecturesBySuite`), and lists of `dnf` and `pacman` channel names.
+
+  `repository`
+  : Repository identity containing `id`, `origin` and `label`.
+
+  The result is unsigned. Its `builder` executable stages a replacement of
+  `public/` and uses `GPG_KEY_ID` for signing, including values loaded from `.env`.
+
+  # Examples
+
+  ```nix
+  public = pkgs.callPackage ./lib/mk-repository.nix { } {
+    inherit packages repositories repository;
+  };
+  ```
+*/
 {
   lib,
   runCommand,

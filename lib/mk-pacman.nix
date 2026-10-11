@@ -1,3 +1,45 @@
+/**
+  Build a Pacman .pkg.tar.zst artifact directly, bypassing declarative integrations.
+  Prefer `mkPackage` to infer certificate/systemd dependencies and actions.
+
+  # Type
+
+  ```
+  mkPacman :: AttrSet -> Derivation
+  ```
+
+  # Inputs
+
+  `name`, `version`, `payload`, `architecture`, `description`, `homepage`, `maintainer`, `license`
+  : Required native package inputs, as documented in `mkPackage`.
+    Here `payload` is required.
+
+  `depends`, `recommends`, `conflicts`, `provides`
+  : Optional package-manager dependency lists; each defaults to `[ ]`.
+
+  `release`, `hooks`
+  : Native revision (default `"1"`) and installation/removal scripts
+    (default `{ }`), as documented in `mkPackage`.
+
+  Return a directory containing the artifact and `passthru.metarepo` metadata.
+  Only native metadata and filesystem content are packaged.
+
+  # Examples
+
+  ```nix
+  metarepo.mkPacman {
+    name = "example";
+    version = "1.0";
+    architecture = "any";
+    inherit payload;
+    description = "Example package";
+    homepage = "https://example.org";
+    maintainer = "Example Authors <hello@example.org>";
+    license = "MIT";
+  }
+  # Produces "$out/example-1.0-1-any.pkg.tar.zst".
+  ```
+*/
 {
   lib,
   runCommand,

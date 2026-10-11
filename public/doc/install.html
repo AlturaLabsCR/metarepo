@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Metarepo: install</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <nav aria-label="Documentation">
+    <a href="index.html">API</a> · <a href="library.html">Library guide</a> ·
+    <a href="install.html">Installation</a> · <a href="review.html">Review</a>
+  </nav>
+  <nav aria-label="Contents"><ul>
+<li><a href="#manual-repository-installation"
+id="toc-manual-repository-installation">Manual repository
+installation</a>
+<ul>
+<li><a href="#ubuntu-apt" id="toc-ubuntu-apt">Ubuntu
+(<code>apt</code>)</a></li>
+<li><a href="#fedora-dnf" id="toc-fedora-dnf">Fedora
+(<code>dnf</code>)</a></li>
+<li><a href="#arch-linux-pacman" id="toc-arch-linux-pacman">Arch Linux
+(<code>pacman</code>)</a></li>
+<li><a href="#nix" id="toc-nix">Nix</a></li>
+</ul></li>
+</ul></nav>
+  <main><h1 id="manual-repository-installation">Manual repository
+installation</h1>
+<p>The generated <code>public/install.sh</code> configures the
+repository automatically for the supported distribution release and
+architecture. To configure it manually, replace
+<code>https://packages.example.org/metarepo</code> below with the
+<code>url</code> from <code>repository.nix</code>. These examples assume
+repository signing is enabled and the published key is
+<code>metarepo.asc</code>.</p>
+<h2 id="ubuntu-apt">Ubuntu (<code>apt</code>)</h2>
+<p>Use a suite published by the repository, such as <code>noble</code>
+or <code>jammy</code>. Change <code>amd64</code> to <code>arm64</code>
+when that architecture is published.</p>
+<pre class="sh"><code>BASE_URL=https://packages.example.org/metarepo
+sudo install -d -m 0755 /etc/apt/keyrings
+curl -fsSL &quot;$BASE_URL/metarepo.asc&quot; | sudo gpg --dearmor --yes -o /etc/apt/keyrings/metarepo.gpg
+echo &quot;deb [arch=amd64 signed-by=/etc/apt/keyrings/metarepo.gpg] $BASE_URL/noble noble main&quot; \
+  | sudo tee /etc/apt/sources.list.d/metarepo.list &gt;/dev/null
+sudo apt update
+sudo apt install metarepo-hello-c metarepo-hello-python</code></pre>
+<h2 id="fedora-dnf">Fedora (<code>dnf</code>)</h2>
+<p>Create <code>/etc/yum.repos.d/metarepo.repo</code>:</p>
+<pre class="ini"><code>[metarepo]
+name=Metarepo Linux packages
+baseurl=https://packages.example.org/metarepo/fedora/
+enabled=1
+gpgcheck=1
+# Disable metadata signature checks to avoid the related warning.
+repo_gpgcheck=0
+gpgkey=https://packages.example.org/metarepo/metarepo.asc</code></pre>
+<p>Then install the packages:</p>
+<pre class="sh"><code>sudo dnf install metarepo-hello-c metarepo-hello-python</code></pre>
+<h2 id="arch-linux-pacman">Arch Linux (<code>pacman</code>)</h2>
+<p>Download and verify the key fingerprint before trusting it:</p>
+<pre class="sh"><code>tmp=&quot;$(mktemp)&quot;
+curl -fsSLo &quot;$tmp&quot; https://packages.example.org/metarepo/metarepo.asc
+gpg --show-keys --with-fingerprint &quot;$tmp&quot;
+fingerprint=&quot;$(gpg --show-keys --with-colons &quot;$tmp&quot; |
+  sed -n &#39;/^fpr:/ { s/:$//; s/.*://; p; q; }&#39;)&quot;
+sudo pacman-key --add &quot;$tmp&quot;
+sudo pacman-key --lsign-key &quot;$fingerprint&quot;
+rm -f &quot;$tmp&quot;</code></pre>
+<p>Add the repository to <code>/etc/pacman.conf</code>:</p>
+<pre class="ini"><code>[metarepo]
+SigLevel = Required
+Server = https://packages.example.org/metarepo/arch/</code></pre>
+<p>Then install the packages:</p>
+<pre class="sh"><code>sudo pacman -Sy metarepo-hello-c metarepo-hello-python</code></pre>
+<h2 id="nix">Nix</h2>
+<p>The flake also exposes the example packages directly. Install either
+package into your Nix profile:</p>
+<pre class="sh"><code>nix profile install github:AlturaLabsCR/metarepo#hello
+nix profile install github:AlturaLabsCR/metarepo#hello-python</code></pre>
+<p>Or run a package without adding it to the profile:</p>
+<pre class="sh"><code>nix run github:AlturaLabsCR/metarepo#hello
+nix run github:AlturaLabsCR/metarepo#hello-python</code></pre></main>
+</body>
+</html>

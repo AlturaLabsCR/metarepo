@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Metarepo: library</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <nav aria-label="Documentation">
+    <a href="index.html">API</a> · <a href="library.html">Library guide</a> ·
+    <a href="install.html">Installation</a> · <a href="review.html">Review</a>
+  </nav>
+  <nav aria-label="Contents"><ul>
+<li><a href="#use-metarepo-as-a-library"
+id="toc-use-metarepo-as-a-library">Use Metarepo as a library</a>
+<ul>
+<li><a href="#declarative-system-integration"
+id="toc-declarative-system-integration">Declarative system
+integration</a></li>
+<li><a href="#installation-hooks"
+id="toc-installation-hooks">Installation hooks</a></li>
+<li><a href="#snapshots-by-commit"
+id="toc-snapshots-by-commit">Snapshots by commit</a></li>
+<li><a href="#project-configuration"
+id="toc-project-configuration">Project configuration</a></li>
+<li><a href="#lower-level-builders"
+id="toc-lower-level-builders">Lower-level builders</a></li>
+<li><a href="#use-this-repository-as-a-template"
+id="toc-use-this-repository-as-a-template">Use this repository as a
+template</a></li>
+</ul></li>
+</ul></nav>
+  <main><h1 id="use-metarepo-as-a-library">Use Metarepo as a
+library</h1>
+<p>See the <a href="index.html">generated function reference</a> for
+types, arguments and examples, and the <a
+href="review.html">maintainability review</a> for recommendations.</p>
+<p>Add Metarepo as a flake input. Your project owns
+<code>packages/</code> and the repository identity and channel/release
+configuration in <code>repository.nix</code>; you do not need to copy or
+edit <code>lib/</code>. Package platforms and native builds live in
+<code>packages/</code>.</p>
+<pre class="nix"><code>{
+  inputs = {
+    nixpkgs.url = &quot;github:NixOS/nixpkgs/nixos-unstable&quot;;
+    metarepo.url = &quot;github:alturalabscr/metarepo&quot;;
+    metarepo.inputs.nixpkgs.follows = &quot;nixpkgs&quot;;
+  };
+
+  outputs = { nixpkgs, metarepo, ... }: {
+    packages = metarepo.lib.mkPackages {
+      packagesDir = ./packages;
+      repository = import ./repository.nix;
+      # Optional: provide package sets with your own overlays/configuration.
+      # pkgsFor = system: import nixpkgs { inherit system; };
+    };
+  };
+}</code></pre>
+<p><code>mkPackages</code> discovers
+<code>packages/&lt;name&gt;/package.nix</code>. Each package declares
+its supported systems in an adjacent <code>systems.nix</code>:</p>
+<pre class="nix"><code>[ &quot;x86_64-linux&quot; &quot;aarch64-linux&quot; ]</code></pre>
+<p>Reuse this declaration in <code>package.nix</code> with
+<code>meta.platforms = import ./systems.nix;</code>. The helper reads
+these lists before calling <code>pkgs.callPackage</code>, so a package
+is evaluated only on its declared systems. These are native build/host
+systems, not cross-compilation targets.</p>
+<p>To add a package, create its directory with <code>package.nix</code>
+and <code>systems.nix</code>; no flake changes are needed. The helper
+exports it under its directory name. An empty packages directory
+produces <code>{ }</code>. <code>build-public</code> is only exported on
+systems with at least one <code>public.nix</code>, and that name is
+reserved.</p>
+<p>To include documentation in <code>public/doc</code>, pass
+<code>documentation = ./my-docs;</code> to <code>mkPackages</code>, or a
+function such as
+<code>documentation = pkgs: pkgs.callPackage ./doc { };</code> to build
+it for each system. <code>mkPublic</code> also accepts a documentation
+directory directly. The channel name <code>doc</code> is reserved when
+documentation is supplied. Unknown publication channels are rejected
+rather than silently omitted.</p>
+<p>An optional <code>public.nix</code> receives <code>package</code>,
+<code>metarepo</code>, and <code>repository</code>, alongside normal
+<code>callPackage</code> dependencies. Use <code>mkPublication</code> to
+create artifacts for the repository’s configured channels:</p>
+<pre class="nix"><code>{ metarepo, repository, package }:
+metarepo.mkPublication {
+  inherit repository package;
+  payload = metarepo.mkPayload { inherit package; };
+  maintainer = &quot;Example Authors &lt;hello@example.invalid&gt;&quot;;
+  formats.apt.depends = [ &quot;libc6&quot; ];
+  formats.dnf.depends = [ &quot;glibc&quot; ];
+  formats.pacman.depends = [ &quot;glibc&quot; ];
+}</code></pre>
+<p><code>mkPublication</code> reads the name, version, description,
+homepage, and SPDX license from the Nix package. It derives architecture
+names from the host platform (APT supports x86_64 and aarch64), or uses
+<code>independent = true</code> for architecture-independent payloads.
+Common package options are passed through to <code>mkPackage</code>. Use
+<code>channels = [ "noble" "fedora" ];</code> to select channels,
+<code>formats.&lt;format&gt;</code> for format-specific options, and
+<code>overrides.&lt;channel&gt;</code> for channel-specific options.
+Options are merged in this order: inferred metadata, common options,
+snapshot publication options, format options, channel overrides. The
+configured channel always determines the format.</p>
+<p><code>mkPayload { package; paths ? [ "bin" "share" ]; prefix ? "usr"; }</code>
+copies selected directories into a native filesystem layout. It does not
+relocate binaries, wrappers or Nix store dependencies. Use a portable
+build, or provide a custom payload. The Python example assembles its
+source and system interpreter launcher explicitly. Fastfetch uses a
+static musl build with optional graphical integrations disabled. A
+package without <code>public.nix</code> remains usable through Nix.</p>
+<p><code>mkPublication</code> returns channel lists and automatically
+publishes every snapshot when <code>package.passthru.snapshots</code>
+exists. <code>mkPublic</code> accepts a single artifact or a list for
+each channel. Custom builders can return records directly:</p>
+<pre class="nix"><code>{ customDeb }:
+{ channels.stable = { architecture = &quot;amd64&quot;; package = customDeb; }; }</code></pre>
+<p>Builder derivations record <code>format</code> and
+<code>architecture</code> in <code>passthru.metarepo</code>. Custom
+records may omit <code>format</code>; it defaults to the channel’s
+configured format. Explicit formats must match the channel.</p>
+<h2 id="declarative-system-integration">Declarative system
+integration</h2>
+<p>Declare files alongside the package options, in
+<code>mkPackage</code> or <code>mkPublication</code>:</p>
+<pre class="nix"><code>certificates.&quot;company.crt&quot; = ./company.crt;
+systemd = {
+  units.&quot;example.service&quot; = ./example.service;
+  sysusers.&quot;example.conf&quot; = ./sysusers.conf;
+  tmpfiles.&quot;example.conf&quot; = ./tmpfiles.conf;
+};</code></pre>
+<p>Values are source files (Nix paths or file derivations such as
+<code>writeText</code>). Keys are plain file basenames;
+sysusers/tmpfiles names must end in <code>.conf</code>. The library adds
+them to the payload and infers dependencies and installation scripts
+from the declarations. The payload is optional for packages consisting
+only of these resources. No boolean flags are needed to activate their
+actions. Each action runs once per package event, regardless of how many
+files it installs. Explicit <code>refreshCertificates = true</code>
+remains supported for custom payloads.</p>
+<p>Certificates must have <code>.crt</code> names and contain one PEM
+certificate per file. Names are prefixed with the package name to avoid
+clashes. APT uses <code>/usr/local/share/ca-certificates</code>, DNF
+<code>/usr/share/pki/ca-trust-source/anchors</code>, and Pacman
+<code>/usr/share/ca-certificates/trust-source/anchors</code>. Trust is
+refreshed on installation, upgrades and removal. Dependencies are
+<code>ca-certificates</code> for APT/DNF and
+<code>ca-certificates-utils</code> for Pacman. These paths and refresh
+commands follow the <a
+href="https://manpages.debian.org/unstable/ca-certificates/update-ca-certificates.8.en.html">Debian
+certificate documentation</a> and <a
+href="https://man.archlinux.org/man/update-ca-trust.8">Arch trust
+documentation</a>.</p>
+<p>Systemd declarations install vendor files under
+<code>/usr/lib/systemd/system</code>, <code>/usr/lib/sysusers.d</code>,
+and <code>/usr/lib/tmpfiles.d</code>, and add a <code>systemd</code>
+dependency. On installation and upgrades, sysusers creates the declared
+users, then tmpfiles creates directories/files, and unit installation
+reloads the systemd manager. Only the package’s configuration basenames
+are passed to sysusers/tmpfiles, allowing administrator overrides in
+<code>/etc</code> to take precedence. Removal reloads the manager after
+units disappear; users and service data remain. Reload is skipped when
+systemd is not running (for example in an offline root). The library
+does not enable, start, restart or stop services automatically. See <a
+href="https://www.freedesktop.org/software/systemd/man/systemd-tmpfiles.html">systemd-tmpfiles</a>.</p>
+<p>Raw <code>hooks.postInstall</code> and <code>hooks.postRemove</code>
+remain available for custom shell actions and run after the inferred
+actions. The declarative options describe what the package installs;
+hooks describe actions on the target system. The library centralizes
+action selection, dependencies and hook composition in
+<code>lib/hooks.nix</code>; <code>lib/package-integrations.nix</code>
+handles file layout and installation.</p>
+<h2 id="installation-hooks">Installation hooks</h2>
+<p>The generic package interface is
+<code>mkPackage { format; ...; }</code>. It dispatches to APT, DNF or
+Pacman and accepts <code>hooks.postInstall</code> and
+<code>hooks.postRemove</code>, both shell script strings running on the
+target system. For example, add these options to
+<code>mkPublication</code>:</p>
+<pre class="nix"><code>refreshCertificates = true;
+hooks.postInstall = &quot;echo &#39;Certificates installed&#39;&quot;;</code></pre>
+<p><code>refreshCertificates</code> adds the certificate tooling to
+dependencies and refreshes trust on installation, upgrades and removal
+using <code>update-ca-certificates</code> for APT and
+<code>update-ca-trust extract</code> for DNF/Pacman. Put certificates in
+the target format’s trust input directory; the helper does not move
+them. Custom hooks run after the refresh. APT hooks run only for
+configure and remove/purge events; RPM uses
+<code>%post</code>/<code>%postun</code>; Pacman uses
+<code>post_install</code>, <code>post_upgrade</code> and
+<code>post_remove</code>. Hooks should be idempotent; each package
+manager controls failure handling. No hooks run while building the Nix
+derivation.</p>
+<h2 id="snapshots-by-commit">Snapshots by commit</h2>
+<p><code>mkSnapshots { snapshots; default; source; build; }</code>
+creates the default Nix package with all versions available under
+<code>passthru.snapshots</code>. <code>source</code> receives the
+snapshot record (including <code>rev</code> and <code>hash</code>);
+<code>build</code> receives its other build options plus the fetched
+<code>src</code>. A snapshot’s optional <code>publication</code> record
+supplies native package options for that version, such as
+<code>depends</code>, <code>recommends</code>, <code>release</code>, or
+hooks. The helper imposes no upstream or build-system convention.</p>
+<p>See <code>packages/fastfetch/snapshots.nix</code> and
+<code>packages/fastfetch-git/snapshots.nix</code>: add a named record
+with a unique <code>version</code>, immutable commit <code>rev</code>,
+archive hash, build options, and publication options. Change
+<code>default</code> in <code>package.nix</code> to select the version
+exported for Nix users. All snapshots are published to subscribed
+channels. These deliberately historical examples use two release commits
+and two development commits; they demonstrate pinning rather than
+tracking latest releases.</p>
+<p>The examples use flat archive hashes from <code>fetchurl</code>.
+Compute a new hash with
+<code>nix store prefetch-file --json https://codeload.github.com/fastfetch-cli/fastfetch/tar.gz/&lt;commit&gt;</code>.
+The shared Fastfetch build recipe belongs to the example; snapshot
+orchestration, filesystem layout, channel selection and package hooks
+belong to the library. <code>fastfetch-git</code> provides
+<code>fastfetch</code>; the two packages conflict because they install
+the same executable. Their static builds vary threading options and
+recommended runtime tools by snapshot.</p>
+<h2 id="project-configuration">Project configuration</h2>
+<pre class="nix"><code>{
+  id = &quot;my-project&quot;;
+  origin = &quot;My Project&quot;;
+  label = &quot;My Project packages&quot;;
+  url = &quot;https://packages.example.org&quot;;
+  channels.stable = { format = &quot;apt&quot;; releases = [ &quot;ubuntu2404&quot; ]; };
+}</code></pre>
+<p>This file contains repository identity, hosting information, and
+supported channels. A package subscribes by providing its artifact for a
+channel in <code>packages/&lt;name&gt;/public.nix</code>, for
+example:</p>
+<pre class="nix"><code>channels.stable = apt;</code></pre>
+<p><code>mkPublic</code> groups artifacts by channel. A channel without
+artifacts is omitted from publication and installer detection. Add
+distribution support by updating the channel’s <code>releases</code>
+list in <code>repository.nix</code>.</p>
+<p>Detection first tries <code>ID + VERSION_ID</code> from
+<code>os-release</code>, removing dots, then
+<code>VERSION_CODENAME</code>. Channel names are also accepted during
+detection. An alias cannot select multiple published channels. IDs,
+channel names, aliases and architectures must match
+<code>[a-zA-Z0-9][a-zA-Z0-9_+-]*</code>.</p>
+<p>A channel is a shared repository: an alias selects all packages
+published in that channel. Use separate channels for incompatible
+distribution builds.</p>
+<p>The installer configures the selected channel and checks its
+architectures. APT metadata also uses each suite’s own architectures.
+There are no distribution version defaults in the library. Associations
+declare compatibility; they do not rebuild a payload against that
+distribution’s libraries or prove ABI compatibility. The native payload
+and dependencies remain the project’s responsibility. Add distribution
+support for an existing format in the relevant
+<code>packages/&lt;name&gt;/public.nix</code>; supporting a new package
+format requires library code.</p>
+<h2 id="lower-level-builders">Lower-level builders</h2>
+<p>For projects with a different layout, use
+<code>metarepo.lib.forPkgs pkgs</code>. It exposes:</p>
+<ul>
+<li><code>mkPackage</code>: takes <code>format</code>
+(<code>"apt"</code>, <code>"dnf"</code>, <code>"pacman"</code>),
+<code>name</code>, <code>version</code>, <code>architecture</code>,
+<code>description</code>, <code>homepage</code>,
+<code>maintainer</code>, <code>license</code>, optional
+<code>depends</code>, <code>recommends</code>, <code>conflicts</code>,
+<code>provides</code> (lists), <code>release</code> (default
+<code>"1"</code>), optional <code>payload</code> (empty by default),
+<code>certificates</code>, <code>systemd</code>, <code>hooks</code> and
+<code>refreshCertificates</code>. Dependency strings use the selected
+format’s syntax. <code>recommends</code> maps to APT/RPM
+<code>Recommends</code> and Pacman <code>optdepends</code>.</li>
+<li><code>mkPublication</code>, <code>mkPayload</code>,
+<code>mkSnapshots</code>: the composition helpers above.</li>
+<li><code>mkApt</code>, <code>mkDnf</code>, <code>mkPacman</code>:
+retained for existing consumers; new code should use
+<code>mkPackage</code> or <code>mkPublication</code> to share behavior
+across formats.</li>
+<li><code>mkPublic { publications; repository; }</code>: an unsigned
+repository derivation. Its <code>builder</code> attribute is the
+executable derivation that generates <code>public/</code> in the working
+directory, with optional signing through <code>GPG_KEY_ID</code>. Its
+<code>installScript</code> attribute contains the generated
+installer.</li>
+</ul>
+<p>No directory discovery is required by these builders. Custom package
+derivations can provide <code>passthru.metarepo</code> metadata for
+<code>mkPublic</code>, or set <code>architecture</code> explicitly in a
+channel entry. A builder derivation can be assigned directly:
+<code>channels.stable = apt;</code>. The record form,
+<code>channels.stable = { package = apt; };</code>, is also
+supported.</p>
+<h2 id="use-this-repository-as-a-template">Use this repository as a
+template</h2>
+<p>Copy or fork this repository, replace the example packages, edit
+<code>repository.nix</code>, and declare platforms in each package’s
+<code>systems.nix</code>. The same library API is used by the template
+itself. To maintain the library separately, use the input-based flake
+above and retain your project configuration, packages and publishing
+workflow. The input URL must reference a revision containing this
+API.</p>
+<p>Both approaches preserve:</p>
+<pre class="sh"><code>nix run .#hello
+nix profile add .#hello
+nix run .#hello-python
+nix run .#build-public</code></pre>
+<p>The existing workflow publishes the resulting static
+<code>public/</code> directory to GitHub Pages. Configure its URL and
+signing secrets as described in the README.</p></main>
+</body>
+</html>

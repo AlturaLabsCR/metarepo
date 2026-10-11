@@ -1,14 +1,20 @@
-{ pkgs, metarepo }:
+{
+  pkgs,
+  metarepo,
+  documentation,
+}:
 let
   api = metarepo.forPkgs pkgs;
   empty = metarepo.mkPackages {
     packagesDir = ./fixtures/empty;
     repository = throw "An empty project must not evaluate repository configuration";
     pkgsFor = _: throw "An empty project must not instantiate nixpkgs";
+    documentation = _: throw "An empty project must not build documentation";
   };
   nativeOnly = metarepo.mkPackages {
     packagesDir = ./fixtures/packages;
     repository = throw "Nix-only packages must not evaluate repository configuration";
+    documentation = _: throw "Nix-only packages must not build documentation";
   };
   repository = {
     id = "test";
@@ -16,9 +22,21 @@ let
     label = "Test's repository";
     url = "https://example.invalid/packages";
     channels = {
-      stable = { format = "apt"; releases = [ "example42" "another1" ]; };
-      next = { format = "dnf"; releases = [ "example43" ]; };
-      rolling = { format = "pacman"; releases = [ "custom" ]; };
+      stable = {
+        format = "apt";
+        releases = [
+          "example42"
+          "another1"
+        ];
+      };
+      next = {
+        format = "dnf";
+        releases = [ "example43" ];
+      };
+      rolling = {
+        format = "pacman";
+        releases = [ "custom" ];
+      };
     };
   };
   publications = [
@@ -45,17 +63,39 @@ let
       };
     }
   ];
+  artifact =
+    format: architecture:
+    pkgs.emptyDirectory
+    // {
+      passthru.metarepo = { inherit format architecture; };
+    };
   directPublications = [
     {
       channels = {
-        stable = pkgs.emptyDirectory // { passthru = { metarepo = { format = "apt"; architecture = "all"; }; }; };
-        next = pkgs.emptyDirectory // { passthru = { metarepo = { format = "dnf"; architecture = "aarch64"; }; }; };
-        rolling = pkgs.emptyDirectory // { passthru = { metarepo = { format = "pacman"; architecture = "any"; }; }; };
+        stable = artifact "apt" "all";
+        next = artifact "dnf" "aarch64";
+        rolling = artifact "pacman" "any";
       };
     }
   ];
   public = api.mkPublic { inherit repository publications; };
-  directPublic = api.mkPublic { inherit repository; publications = directPublications; };
+  directPublic = api.mkPublic {
+    inherit repository;
+    publications = directPublications;
+  };
+  documentedPublic = api.mkPublic {
+    repository = repository // {
+      channels = { };
+    };
+    publications = [ ];
+    documentation = pkgs.writeTextDir "index.html" "<h1>Test documentation</h1>";
+  };
+  documentedProject = metarepo.mkPackages {
+    packagesDir = ./fixtures/project;
+    inherit repository;
+    pkgsFor = _: pkgs;
+    documentation = pkgs: pkgs.writeTextDir "index.html" "<h1>Test documentation</h1>";
+  };
   invalid =
     releases:
     builtins.tryEval
@@ -86,17 +126,58 @@ assert
   }).success;
 assert !(invalid { stable = [ "bad|selector" ]; }).success;
 assert public.installScript == directPublic.installScript;
-assert !(builtins.tryEval (api.mkPublic {
-  inherit repository;
-  publications = [ { channels.stable = (builtins.head directPublications).channels.next; } ];
-}).drvPath).success;
+assert
+  !(builtins.tryEval
+    (api.mkPublic {
+      inherit repository;
+      publications = [ { channels.stable = (builtins.head directPublications).channels.next; } ];
+    }).drvPath
+  ).success;
+assert
+  !(builtins.tryEval
+    (api.mkPublic {
+      inherit repository;
+      publications = [ { channels.typo = [ ]; } ];
+    }).drvPath
+  ).success;
+assert
+  !(builtins.tryEval
+    (api.mkPublic {
+      repository = repository // {
+        channels.doc.format = "apt";
+      };
+      publications = [ ];
+      documentation = pkgs.emptyDirectory;
+    }).drvPath
+  ).success;
 {
-  apt-multiversion = pkgs.runCommand "apt-multiversion-tests" {
-    nativeBuildInputs = [ pkgs.dpkg pkgs.apt pkgs.gzip ];
-  } ''
-    sh ${./apt-multiversion.sh} ${../lib/repository.sh}
+  documentation = pkgs.runCommand "documentation-tests" { } ''
+    diff -ru ${documentation} ${../public/doc}
     touch "$out"
   '';
+  public-documentation = pkgs.runCommand "public-documentation-tests" { } ''
+    test -f ${documentedPublic}/doc/index.html
+    ${documentedProject.${pkgs.stdenv.hostPlatform.system}.build-public}/bin/build-public
+    cmp ${documentedPublic}/doc/index.html public/doc/index.html
+    touch public/obsolete
+    ${documentedProject.${pkgs.stdenv.hostPlatform.system}.build-public}/bin/build-public
+    test ! -e public/obsolete
+    cmp ${documentedPublic}/doc/index.html public/doc/index.html
+    touch "$out"
+  '';
+  apt-multiversion =
+    pkgs.runCommand "apt-multiversion-tests"
+      {
+        nativeBuildInputs = [
+          pkgs.dpkg
+          pkgs.apt
+          pkgs.gzip
+        ];
+      }
+      ''
+        sh ${./apt-multiversion.sh} ${../lib/repository.sh}
+        touch "$out"
+      '';
   integrations = import ./integrations.nix { inherit pkgs; };
   fastfetch = import ./fastfetch.nix { inherit pkgs api; };
   native-packages = import ./native-packages.nix { inherit pkgs api; };

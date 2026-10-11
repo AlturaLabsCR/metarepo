@@ -1,5 +1,8 @@
 # Use Metarepo as a library
 
+See the [generated function reference](../public/doc/api.md) for types, arguments
+and examples, and the [maintainability review](review.md) for recommendations.
+
 Add Metarepo as a flake input. Your project owns `packages/` and the repository
 identity and channel/release configuration in `repository.nix`; you do not
 need to copy or edit `lib/`. Package platforms and native builds live in
@@ -40,6 +43,13 @@ To add a package, create its directory with `package.nix` and `systems.nix`;
 no flake changes are needed. The helper exports it under its directory name.
 An empty packages directory produces `{ }`. `build-public` is only exported
 on systems with at least one `public.nix`, and that name is reserved.
+
+To include documentation in `public/doc`, pass `documentation = ./my-docs;`
+to `mkPackages`, or a function such as
+`documentation = pkgs: pkgs.callPackage ./doc { };` to build it for each system.
+`mkPublic` also accepts a documentation directory directly. The channel name
+`doc` is reserved when documentation is supplied. Unknown publication channels
+are rejected rather than silently omitted.
 
 An optional `public.nix` receives `package`, `metarepo`, and `repository`,
 alongside normal `callPackage` dependencies. Use `mkPublication` to create

@@ -7,6 +7,9 @@ Use `lib.mkPackages` to export packages and the repository builder from another
 flake, or `lib.forPkgs` for `mkPublication` and `mkPackage`. See
 [the library API and template guide](doc/library.md). Platforms live in `packages/` and distribution aliases in `repository.nix`; adding packages or releases requires no changes elsewhere.
 
+The [generated API reference](public/doc/api.md) documents each library function.
+See [the maintainability review](doc/review.md) for changes and recommendations.
+
 The examples include C, Python, `fastfetch` and `fastfetch-git`. Fastfetch
 snapshots pin commits and hashes, with build options and dependencies per version.
 
@@ -19,13 +22,27 @@ nix profile add .#hello
 nix run .#build-public
 ```
 
-This generates the repository in `public/`, including `install.sh`. Set
+This generates the repository in `public/`, including `install.sh` and the
+nixdoc reference in `public/doc/`. Set
 `GPG_KEY_ID` to sign packages and repository metadata.
+
+Build documentation separately and refresh the tracked files with:
+
+```sh
+nix build .#docs
+mkdir -p public/doc
+cp -R result/. public/doc/
+chmod -R u+w public/doc/
+```
+
+Format Nix files with `nix fmt` and run the tests with `nix flake check`.
+The documentation check detects stale generated files.
 
 ## Staging validation
 
 The **Validate staging repository** workflow runs on pushes to `staging`, pull
-requests targeting `main` or `staging`, and manual runs. It checks that
+requests targeting `main` or `staging`, and manual runs. It checks formatting,
+the library tests and generated documentation, then verifies that
 `nix run .#build-public` successfully generates `public/`.
 
 ## Publish

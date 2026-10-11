@@ -1,0 +1,628 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Metarepo: api</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <nav aria-label="Documentation">
+    <a href="index.html">API</a> · <a href="library.html">Library guide</a> ·
+    <a href="install.html">Installation</a> · <a href="review.html">Review</a>
+  </nav>
+  <nav aria-label="Contents"><ul>
+<li><a href="#metarepo-library-reference"
+id="toc-metarepo-library-reference">Metarepo library reference</a>
+<ul>
+<li><a href="#metarepo.forpkgs"
+id="toc-metarepo.forpkgs"><code>metarepo.forPkgs</code></a></li>
+<li><a href="#metarepo.internal.hooks"
+id="toc-metarepo.internal.hooks"><code>metarepo.internal.hooks</code></a></li>
+<li><a href="#metarepo.internal.mkrepository"
+id="toc-metarepo.internal.mkrepository"><code>metarepo.internal.mkRepository</code></a></li>
+<li><a href="#metarepo.internal.packageintegrations"
+id="toc-metarepo.internal.packageintegrations"><code>metarepo.internal.packageIntegrations</code></a></li>
+<li><a href="#metarepo.mkapt"
+id="toc-metarepo.mkapt"><code>metarepo.mkApt</code></a></li>
+<li><a href="#metarepo.mkdnf"
+id="toc-metarepo.mkdnf"><code>metarepo.mkDnf</code></a></li>
+<li><a href="#metarepo.mkpackage"
+id="toc-metarepo.mkpackage"><code>metarepo.mkPackage</code></a></li>
+<li><a href="#metarepo.mkpackages"
+id="toc-metarepo.mkpackages"><code>metarepo.mkPackages</code></a></li>
+<li><a href="#metarepo.mkpacman"
+id="toc-metarepo.mkpacman"><code>metarepo.mkPacman</code></a></li>
+<li><a href="#metarepo.mkpayload"
+id="toc-metarepo.mkpayload"><code>metarepo.mkPayload</code></a></li>
+<li><a href="#metarepo.mkpublic"
+id="toc-metarepo.mkpublic"><code>metarepo.mkPublic</code></a></li>
+<li><a href="#metarepo.mkpublication"
+id="toc-metarepo.mkpublication"><code>metarepo.mkPublication</code></a></li>
+<li><a href="#metarepo.mksnapshots"
+id="toc-metarepo.mksnapshots"><code>metarepo.mkSnapshots</code></a></li>
+</ul></li>
+</ul></nav>
+  <main><h1 id="metarepo-library-reference">Metarepo library
+reference</h1>
+<p>Generated from Nix doc-comments with nixdoc. See the <a
+href="library.html">library guide</a> and <a
+href="install.html">installation guide</a>. Entries under
+metarepo.internal describe implementation helpers.</p>
+<h2 id="metarepo.forpkgs"><code>metarepo.forPkgs</code></h2>
+<p>Bind the package and repository builders to a Nixpkgs package set.
+The builders use that set’s overlays, configuration and host
+platform.</p>
+<h3 id="type">Type</h3>
+<pre><code>forPkgs :: AttrSet -&gt; AttrSet</code></pre>
+<h3 id="inputs">Inputs</h3>
+<dl>
+<dt><code>pkgs</code></dt>
+<dd>
+A Nixpkgs package set. Native package builders require Linux.
+</dd>
+</dl>
+<h3 id="examples">Examples</h3>
+<pre class="nix"><code>metarepo = inputs.metarepo.lib.forPkgs pkgs;
+# metarepo.mkPackage, mkPublication, mkPayload, mkSnapshots,
+# mkPublic, mkApt, mkDnf and mkPacman are now available.</code></pre>
+<h2
+id="metarepo.internal.hooks"><code>metarepo.internal.hooks</code></h2>
+<p>Internal composer for package installation and removal actions.
+Enable actions from declared files, infer dependencies and append custom
+hooks. Sysusers runs before tmpfiles, unit reloads and certificate trust
+refresh. No action enables or starts services or deletes users or
+service data.</p>
+<h3 id="type-1">Type</h3>
+<pre><code>hooks :: AttrSet -&gt; { depends :: [String], hooks :: AttrSet }</code></pre>
+<h3 id="inputs-1">Inputs</h3>
+<dl>
+<dt><code>format</code></dt>
+<dd>
+Package format: <code>apt</code>, <code>dnf</code> or
+<code>pacman</code>.
+</dd>
+<dt><code>certificates</code>, <code>systemd</code>,
+<code>refreshCertificates</code></dt>
+<dd>
+Integration declarations from <code>mkPackage</code>; these inputs are
+required here.
+</dd>
+<dt><code>hooks</code></dt>
+<dd>
+Optional <code>postInstall</code> and <code>postRemove</code> shell
+strings; defaults to <code>{ }</code>. Other hook names are rejected.
+</dd>
+</dl>
+<h3 id="examples-1">Examples</h3>
+<pre class="nix"><code>actions = import ./lib/hooks.nix { inherit lib; } {
+  format = &quot;apt&quot;;
+  certificates = { };
+  systemd = { };
+  refreshCertificates = true;
+  hooks.postInstall = &quot;echo refreshed&quot;;
+};
+# actions.depends == [ &quot;ca-certificates&quot; ]</code></pre>
+<h2
+id="metarepo.internal.mkrepository"><code>metarepo.internal.mkRepository</code></h2>
+<p>Internal repository builder used by <code>mkPublic</code>. Generate
+APT indexes, RPM metadata and Pacman databases from staged
+artifacts.</p>
+<h3 id="type-2">Type</h3>
+<pre><code>mkRepository :: AttrSet -&gt; Derivation</code></pre>
+<h3 id="inputs-2">Inputs</h3>
+<dl>
+<dt><code>packages</code></dt>
+<dd>
+Directory containing per-channel artifacts and an
+<code>install.sh</code>.
+</dd>
+<dt><code>repositories</code></dt>
+<dd>
+APT configuration (<code>suites</code>, fallback
+<code>architectures</code>, optional <code>architecturesBySuite</code>),
+and lists of <code>dnf</code> and <code>pacman</code> channel names.
+</dd>
+<dt><code>repository</code></dt>
+<dd>
+Repository identity containing <code>id</code>, <code>origin</code> and
+<code>label</code>.
+</dd>
+</dl>
+<p>The result is unsigned. Its <code>builder</code> executable stages a
+replacement of <code>public/</code> and uses <code>GPG_KEY_ID</code> for
+signing, including values loaded from <code>.env</code>.</p>
+<h3 id="examples-2">Examples</h3>
+<pre class="nix"><code>public = pkgs.callPackage ./lib/mk-repository.nix { } {
+  inherit packages repositories repository;
+};</code></pre>
+<h2
+id="metarepo.internal.packageintegrations"><code>metarepo.internal.packageIntegrations</code></h2>
+<p>Internal payload assembler for certificate and systemd resources.
+Validate plain basenames and file extensions, install vendor files and
+combine inferred dependencies and hooks. Preserve the original payload
+when no files are declared.</p>
+<h3 id="type-3">Type</h3>
+<pre><code>packageIntegrations :: AttrSet -&gt; { payload :: Derivation, depends :: [String], hooks :: AttrSet }</code></pre>
+<h3 id="inputs-3">Inputs</h3>
+<dl>
+<dt><code>name</code></dt>
+<dd>
+Package name, used to prefix certificate filenames.
+</dd>
+<dt><code>format</code>, <code>payload</code>,
+<code>certificates</code>, <code>systemd</code>,
+<code>refreshCertificates</code></dt>
+<dd>
+Required integration inputs as documented in <code>mkPackage</code>.
+</dd>
+<dt><code>hooks</code></dt>
+<dd>
+Optional custom installation/removal scripts; defaults to
+<code>{ }</code>.
+</dd>
+</dl>
+<p>Return <code>payload</code>, <code>depends</code> and
+<code>hooks</code> for the native format builder.</p>
+<h3 id="examples-3">Examples</h3>
+<pre class="nix"><code>integration = pkgs.callPackage ./lib/package-integrations.nix { } {
+  name = &quot;example&quot;;
+  format = &quot;apt&quot;;
+  payload = pkgs.emptyDirectory;
+  certificates.&quot;example.crt&quot; = ./example.crt;
+  systemd = { };
+  refreshCertificates = false;
+};</code></pre>
+<h2 id="metarepo.mkapt"><code>metarepo.mkApt</code></h2>
+<p>Build a Debian .deb artifact directly, bypassing declarative
+integrations. Prefer <code>mkPackage</code> to infer certificate/systemd
+dependencies and actions.</p>
+<h3 id="type-4">Type</h3>
+<pre><code>mkApt :: AttrSet -&gt; Derivation</code></pre>
+<h3 id="inputs-4">Inputs</h3>
+<dl>
+<dt><code>name</code>, <code>version</code>, <code>payload</code>,
+<code>architecture</code>, <code>description</code>,
+<code>homepage</code>, <code>maintainer</code>,
+<code>license</code></dt>
+<dd>
+Required native package inputs, as documented in <code>mkPackage</code>.
+Here <code>payload</code> is required.
+</dd>
+<dt><code>depends</code>, <code>recommends</code>,
+<code>conflicts</code>, <code>provides</code></dt>
+<dd>
+Optional package-manager dependency lists; each defaults to
+<code>[ ]</code>.
+</dd>
+<dt><code>release</code>, <code>hooks</code></dt>
+<dd>
+Native revision (default <code>"1"</code>) and installation/removal
+scripts (default <code>{ }</code>), as documented in
+<code>mkPackage</code>.
+</dd>
+</dl>
+<p>Return a directory containing the artifact and
+<code>passthru.metarepo</code> metadata. Only native metadata and
+filesystem content are packaged.</p>
+<h3 id="examples-4">Examples</h3>
+<pre class="nix"><code>metarepo.mkApt {
+  name = &quot;example&quot;;
+  version = &quot;1.0&quot;;
+  architecture = &quot;all&quot;;
+  inherit payload;
+  description = &quot;Example package&quot;;
+  homepage = &quot;https://example.org&quot;;
+  maintainer = &quot;Example Authors &lt;hello@example.org&gt;&quot;;
+  license = &quot;MIT&quot;;
+}
+# Produces &quot;$out/example_1.0-1_all.deb&quot;.</code></pre>
+<h2 id="metarepo.mkdnf"><code>metarepo.mkDnf</code></h2>
+<p>Build a RPM .rpm artifact directly, bypassing declarative
+integrations. Prefer <code>mkPackage</code> to infer certificate/systemd
+dependencies and actions.</p>
+<h3 id="type-5">Type</h3>
+<pre><code>mkDnf :: AttrSet -&gt; Derivation</code></pre>
+<h3 id="inputs-5">Inputs</h3>
+<dl>
+<dt><code>name</code>, <code>version</code>, <code>payload</code>,
+<code>architecture</code>, <code>description</code>,
+<code>homepage</code>, <code>maintainer</code>,
+<code>license</code></dt>
+<dd>
+Required native package inputs, as documented in <code>mkPackage</code>.
+Here <code>payload</code> is required.
+</dd>
+<dt><code>depends</code>, <code>recommends</code>,
+<code>conflicts</code>, <code>provides</code></dt>
+<dd>
+Optional package-manager dependency lists; each defaults to
+<code>[ ]</code>.
+</dd>
+<dt><code>release</code>, <code>hooks</code></dt>
+<dd>
+Native revision (default <code>"1"</code>) and installation/removal
+scripts (default <code>{ }</code>), as documented in
+<code>mkPackage</code>.
+</dd>
+</dl>
+<p>Return a directory containing the artifact and
+<code>passthru.metarepo</code> metadata. Only native metadata and
+filesystem content are packaged.</p>
+<h3 id="examples-5">Examples</h3>
+<pre class="nix"><code>metarepo.mkDnf {
+  name = &quot;example&quot;;
+  version = &quot;1.0&quot;;
+  architecture = &quot;noarch&quot;;
+  inherit payload;
+  description = &quot;Example package&quot;;
+  homepage = &quot;https://example.org&quot;;
+  maintainer = &quot;Example Authors &lt;hello@example.org&gt;&quot;;
+  license = &quot;MIT&quot;;
+}
+# Produces &quot;$out/example-1.0-1.noarch.rpm&quot;.</code></pre>
+<h2 id="metarepo.mkpackage"><code>metarepo.mkPackage</code></h2>
+<p>Build an APT, DNF or Pacman artifact from a native filesystem
+payload. Declarative certificate and systemd files extend the payload,
+dependencies and hooks before dispatching to the format builder. Hooks
+run on the target machine, never during the Nix build.</p>
+<p>Return a derivation containing the native package file and
+<code>passthru.metarepo = { format; architecture; }</code>.</p>
+<h3 id="type-6">Type</h3>
+<pre><code>mkPackage :: AttrSet -&gt; Derivation</code></pre>
+<h3 id="inputs-6">Inputs</h3>
+<dl>
+<dt><code>format</code></dt>
+<dd>
+One of <code>"apt"</code>, <code>"dnf"</code> or <code>"pacman"</code>.
+</dd>
+<dt><code>name</code>, <code>version</code>,
+<code>architecture</code></dt>
+<dd>
+Native package name, upstream version and format-specific architecture.
+</dd>
+<dt><code>description</code>, <code>homepage</code>,
+<code>maintainer</code>, <code>license</code></dt>
+<dd>
+Required metadata strings. <code>license</code> is an SPDX identifier;
+APT accepts it for API consistency but does not write it to the control
+file.
+</dd>
+<dt><code>payload</code></dt>
+<dd>
+Directory laid out as the target filesystem root. Defaults to an empty
+directory, useful for packages containing only declarative resources.
+</dd>
+<dt><code>depends</code>, <code>recommends</code>,
+<code>conflicts</code>, <code>provides</code></dt>
+<dd>
+Lists of strings in the package manager’s syntax; default to
+<code>[ ]</code>. Pacman uses <code>optdepends</code> for
+<code>recommends</code>.
+</dd>
+<dt><code>release</code></dt>
+<dd>
+Native package revision string; defaults to <code>"1"</code>.
+</dd>
+<dt><code>certificates</code></dt>
+<dd>
+Attribute set from plain <code>.crt</code> basenames to PEM source
+files; defaults to <code>{ }</code>. Files are prefixed with the package
+name and trust is refreshed.
+</dd>
+<dt><code>systemd</code></dt>
+<dd>
+Optional <code>units</code>, <code>sysusers</code> and
+<code>tmpfiles</code> file maps; defaults to <code>{ }</code>. Sysusers
+and tmpfiles basenames must end in <code>.conf</code>. Installation
+creates users, applies tmpfiles and reloads units as needed. Services
+are not started.
+</dd>
+<dt><code>hooks</code></dt>
+<dd>
+Optional shell strings <code>postInstall</code> and
+<code>postRemove</code>; defaults to <code>{ }</code>. Custom actions
+run after inferred actions and should be idempotent.
+</dd>
+<dt><code>refreshCertificates</code></dt>
+<dd>
+Also refresh trust for certificates in a custom payload; defaults to
+<code>false</code>.
+</dd>
+</dl>
+<h3 id="examples-6">Examples</h3>
+<pre class="nix"><code>metarepo.mkPackage {
+  format = &quot;apt&quot;;
+  name = &quot;example-ca&quot;;
+  version = &quot;1.0&quot;;
+  architecture = &quot;all&quot;;
+  description = &quot;Example trust anchor&quot;;
+  homepage = &quot;https://example.org&quot;;
+  maintainer = &quot;Example Authors &lt;hello@example.org&gt;&quot;;
+  license = &quot;MIT&quot;;
+  certificates.&quot;example.crt&quot; = ./example.crt;
+}</code></pre>
+<h2 id="metarepo.mkpackages"><code>metarepo.mkPackages</code></h2>
+<p>Discover packages and publications using the
+<code>packages/&lt;name&gt;</code> convention. Each package needs
+<code>package.nix</code> and a <code>systems.nix</code> list. An
+optional <code>public.nix</code> receives <code>package</code>,
+<code>metarepo</code>, <code>repository</code> and Nixpkgs dependencies.
+Only packages declared for a system are evaluated on that system.</p>
+<p>Return an attribute set indexed by system, suitable for a flake’s
+<code>packages</code>. Systems with publications also export
+<code>build-public</code>. An empty directory returns <code>{ }</code>
+without evaluating Nixpkgs or repository configuration.</p>
+<h3 id="type-7">Type</h3>
+<pre><code>mkPackages :: AttrSet -&gt; AttrSet</code></pre>
+<h3 id="inputs-7">Inputs</h3>
+<dl>
+<dt><code>packagesDir</code></dt>
+<dd>
+Path to package directories. <code>build-public</code> is a reserved
+package name.
+</dd>
+<dt><code>repository</code></dt>
+<dd>
+Repository identity and channels; see <code>mkPublic</code>.
+</dd>
+<dt><code>pkgsFor</code></dt>
+<dd>
+Optional function from system name to package set. Defaults to the
+input’s <code>nixpkgs.legacyPackages</code>.
+</dd>
+<dt><code>documentation</code></dt>
+<dd>
+Optional documentation directory, or function from package set to
+directory. Defaults to <code>null</code>. Its contents are published
+under <code>public/doc</code>.
+</dd>
+</dl>
+<h3 id="examples-7">Examples</h3>
+<pre class="nix"><code>packages = metarepo.lib.mkPackages {
+  packagesDir = ./packages;
+  repository = import ./repository.nix;
+  pkgsFor = system: import nixpkgs { inherit system; overlays = [ myOverlay ]; };
+};</code></pre>
+<h2 id="metarepo.mkpacman"><code>metarepo.mkPacman</code></h2>
+<p>Build a Pacman .pkg.tar.zst artifact directly, bypassing declarative
+integrations. Prefer <code>mkPackage</code> to infer certificate/systemd
+dependencies and actions.</p>
+<h3 id="type-8">Type</h3>
+<pre><code>mkPacman :: AttrSet -&gt; Derivation</code></pre>
+<h3 id="inputs-8">Inputs</h3>
+<dl>
+<dt><code>name</code>, <code>version</code>, <code>payload</code>,
+<code>architecture</code>, <code>description</code>,
+<code>homepage</code>, <code>maintainer</code>,
+<code>license</code></dt>
+<dd>
+Required native package inputs, as documented in <code>mkPackage</code>.
+Here <code>payload</code> is required.
+</dd>
+<dt><code>depends</code>, <code>recommends</code>,
+<code>conflicts</code>, <code>provides</code></dt>
+<dd>
+Optional package-manager dependency lists; each defaults to
+<code>[ ]</code>.
+</dd>
+<dt><code>release</code>, <code>hooks</code></dt>
+<dd>
+Native revision (default <code>"1"</code>) and installation/removal
+scripts (default <code>{ }</code>), as documented in
+<code>mkPackage</code>.
+</dd>
+</dl>
+<p>Return a directory containing the artifact and
+<code>passthru.metarepo</code> metadata. Only native metadata and
+filesystem content are packaged.</p>
+<h3 id="examples-8">Examples</h3>
+<pre class="nix"><code>metarepo.mkPacman {
+  name = &quot;example&quot;;
+  version = &quot;1.0&quot;;
+  architecture = &quot;any&quot;;
+  inherit payload;
+  description = &quot;Example package&quot;;
+  homepage = &quot;https://example.org&quot;;
+  maintainer = &quot;Example Authors &lt;hello@example.org&gt;&quot;;
+  license = &quot;MIT&quot;;
+}
+# Produces &quot;$out/example-1.0-1-any.pkg.tar.zst&quot;.</code></pre>
+<h2 id="metarepo.mkpayload"><code>metarepo.mkPayload</code></h2>
+<p>Copy selected package trees into a native filesystem layout. This
+copies files without relocating binaries, wrappers or Nix store
+references. Use a portable build or assemble a custom payload when
+relocation is needed.</p>
+<h3 id="type-9">Type</h3>
+<pre><code>mkPayload :: AttrSet -&gt; Derivation</code></pre>
+<h3 id="inputs-9">Inputs</h3>
+<dl>
+<dt><code>package</code></dt>
+<dd>
+Derivation with <code>pname</code> and <code>version</code>, whose
+selected trees will be copied.
+</dd>
+<dt><code>paths</code></dt>
+<dd>
+Paths relative to the package output; defaults to
+<code>[ "bin" "share" ]</code>. Each tree is copied by basename; paths
+must exist.
+</dd>
+<dt><code>prefix</code></dt>
+<dd>
+Destination prefix inside the payload; defaults to <code>"usr"</code>.
+</dd>
+</dl>
+<h3 id="examples-9">Examples</h3>
+<pre class="nix"><code>metarepo.mkPayload { inherit package; paths = [ &quot;bin&quot; ]; }
+# Result: $out/usr/bin contains the package&#39;s bin tree.</code></pre>
+<h2 id="metarepo.mkpublic"><code>metarepo.mkPublic</code></h2>
+<p>Assemble native artifacts into an unsigned repository and generate
+its installer. Configured channels without artifacts are omitted.
+Unknown publication channels, mismatched formats, unsafe tokens and
+ambiguous release selectors are rejected.</p>
+<p>Return a repository derivation. Its <code>builder</code> is an
+executable that replaces <code>public/</code> in the working directory
+and optionally signs using <code>GPG_KEY_ID</code> from the environment
+or <code>.env</code>. Its <code>installScript</code> is the generated
+installer.</p>
+<h3 id="type-10">Type</h3>
+<pre><code>mkPublic :: AttrSet -&gt; Derivation</code></pre>
+<h3 id="inputs-10">Inputs</h3>
+<dl>
+<dt><code>publications</code></dt>
+<dd>
+List of <code>mkPublication</code> results. Each
+<code>channels.&lt;name&gt;</code> accepts one artifact or a list.
+Artifacts need <code>passthru.metarepo.format</code> and
+<code>architecture</code>, or a record
+<code>{ package; architecture; format; }</code>. Record metadata can
+fall back to the package’s metadata; record <code>format</code>
+ultimately defaults to the configured channel format.
+</dd>
+<dt><code>repository</code></dt>
+<dd>
+Attribute set with <code>id</code>, <code>origin</code>,
+<code>label</code>, <code>url</code> and <code>channels</code>. Each
+channel specifies <code>format</code> (<code>apt</code>,
+<code>dnf</code> or <code>pacman</code>) and optional
+<code>releases</code> (installer aliases, default <code>[ ]</code>). The
+installer also accepts channel names. IDs, published channels, release
+aliases and architectures must match
+<code>[a-zA-Z0-9][a-zA-Z0-9_+-]*</code>.
+</dd>
+<dt><code>documentation</code></dt>
+<dd>
+Optional directory copied under <code>public/doc</code>; defaults to
+<code>null</code>. When supplied, the channel name <code>doc</code> is
+reserved.
+</dd>
+</dl>
+<h3 id="examples-10">Examples</h3>
+<pre class="nix"><code>public = metarepo.mkPublic {
+  publications = [ publication ];
+  repository = {
+    id = &quot;example&quot;;
+    origin = &quot;Example&quot;;
+    label = &quot;Example packages&quot;;
+    url = &quot;https://packages.example.org&quot;;
+    channels.stable = { format = &quot;apt&quot;; releases = [ &quot;ubuntu2404&quot; ]; };
+  };
+};
+# public.builder generates public/; public itself is an unsigned Nix output.</code></pre>
+<h2 id="metarepo.mkpublication"><code>metarepo.mkPublication</code></h2>
+<p>Publish a Nix package, or all its snapshots, to configured repository
+channels. Infer native metadata from <code>pname</code>,
+<code>version</code> and <code>meta</code>, and infer architecture from
+the host platform. APT inference supports x86_64-linux and
+aarch64-linux.</p>
+<p>Options merge in this order: inferred metadata, common package
+options, snapshot <code>passthru.publication</code>, format options,
+channel overrides. The repository channel always determines the final
+format.</p>
+<p>Return <code>{ channels.&lt;name&gt; = [ artifact ... ]; }</code> for
+<code>mkPublic</code>. When <code>package.passthru.snapshots</code>
+exists, every snapshot is published.</p>
+<h3 id="type-11">Type</h3>
+<pre><code>mkPublication :: AttrSet -&gt; AttrSet</code></pre>
+<h3 id="inputs-11">Inputs</h3>
+<dl>
+<dt><code>repository</code></dt>
+<dd>
+Repository configuration with a <code>channels</code> attribute set; see
+<code>mkPublic</code>.
+</dd>
+<dt><code>package</code></dt>
+<dd>
+Nix derivation. Inferred metadata uses <code>pname</code>,
+<code>version</code>, <code>meta.description</code>,
+<code>meta.homepage</code> and <code>meta.license.spdxId</code>.
+Override missing or unsuitable metadata through common package options.
+</dd>
+<dt><code>payload</code></dt>
+<dd>
+Native filesystem directory, or function from each snapshot package to
+its directory. Defaults to an empty directory. Use a function when the
+payload depends on a snapshot’s contents.
+</dd>
+<dt><code>channels</code></dt>
+<dd>
+Channel names to subscribe to; defaults to all configured channels.
+Unknown names are rejected.
+</dd>
+<dt><code>independent</code></dt>
+<dd>
+Defaults to <code>false</code>. When true, use APT <code>all</code>, RPM
+<code>noarch</code> and Pacman <code>any</code>.
+</dd>
+<dt><code>formats</code></dt>
+<dd>
+Package option overrides indexed by format; defaults to
+<code>{ }</code>.
+</dd>
+<dt><code>overrides</code></dt>
+<dd>
+Package option overrides indexed by channel; defaults to
+<code>{ }</code>.
+</dd>
+</dl>
+<p>Additional attributes are common <code>mkPackage</code> options.
+Supply <code>maintainer</code>, which cannot be inferred from the Nix
+package.</p>
+<h3 id="examples-11">Examples</h3>
+<pre class="nix"><code>metarepo.mkPublication {
+  inherit repository package;
+  payload = package: metarepo.mkPayload { inherit package; };
+  maintainer = &quot;Example Authors &lt;hello@example.org&gt;&quot;;
+  formats.apt.depends = [ &quot;libc6&quot; ];
+  formats.dnf.depends = [ &quot;glibc&quot; ];
+  formats.pacman.depends = [ &quot;glibc&quot; ];
+}</code></pre>
+<h2 id="metarepo.mksnapshots"><code>metarepo.mkSnapshots</code></h2>
+<p>Build named snapshots and return the selected default package. Attach
+every built package under <code>passthru.snapshots</code>, and attach
+each snapshot’s native publication options under
+<code>passthru.publication</code>. Existing passthru attributes are
+preserved.</p>
+<h3 id="type-12">Type</h3>
+<pre><code>mkSnapshots :: AttrSet -&gt; Derivation</code></pre>
+<h3 id="inputs-12">Inputs</h3>
+<dl>
+<dt><code>snapshots</code></dt>
+<dd>
+Attribute set of snapshot records. Records contain source fields such as
+<code>rev</code> and <code>hash</code>, arbitrary build options, and
+optional <code>publication</code>.
+</dd>
+<dt><code>default</code></dt>
+<dd>
+Name of the snapshot returned for Nix users. Must exist in
+<code>snapshots</code>.
+</dd>
+<dt><code>source</code></dt>
+<dd>
+Function receiving the entire snapshot record and returning its source.
+</dd>
+<dt><code>build</code></dt>
+<dd>
+Function receiving the snapshot minus <code>rev</code>,
+<code>hash</code> and <code>publication</code>, plus
+<code>src = source snapshot</code>. Must return a derivation with
+<code>overrideAttrs</code>.
+</dd>
+</dl>
+<h3 id="examples-12">Examples</h3>
+<pre class="nix"><code>metarepo.mkSnapshots {
+  snapshots.release = { version = &quot;1.0&quot;; rev = &quot;immutable-commit&quot;; hash = sourceHash; };
+  default = &quot;release&quot;;
+  source = snapshot: fetchurl {
+    url = &quot;https://example.org/archive/${snapshot.rev}.tar.gz&quot;;
+    inherit (snapshot) hash;
+  };
+  build = { version, src }: stdenv.mkDerivation {
+    pname = &quot;example&quot;;
+    inherit version src;
+  };
+}</code></pre></main>
+</body>
+</html>

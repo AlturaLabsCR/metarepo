@@ -1,4 +1,71 @@
-{ lib, stdenv, emptyDirectory, mkPackage }:
+/**
+  Publish a Nix package, or all its snapshots, to configured repository channels.
+  Infer native metadata from `pname`, `version` and `meta`, and infer architecture
+  from the host platform. APT inference supports x86_64-linux and aarch64-linux.
+
+  Options merge in this order: inferred metadata, common package options,
+  snapshot `passthru.publication`, format options, channel overrides.
+  The repository channel always determines the final format.
+
+  Return `{ channels.<name> = [ artifact ... ]; }` for `mkPublic`.
+  When `package.passthru.snapshots` exists, every snapshot is published.
+
+  # Type
+
+  ```
+  mkPublication :: AttrSet -> AttrSet
+  ```
+
+  # Inputs
+
+  `repository`
+  : Repository configuration with a `channels` attribute set; see `mkPublic`.
+
+  `package`
+  : Nix derivation. Inferred metadata uses `pname`, `version`,
+    `meta.description`, `meta.homepage` and `meta.license.spdxId`.
+    Override missing or unsuitable metadata through common package options.
+
+  `payload`
+  : Native filesystem directory, or function from each snapshot package to
+    its directory. Defaults to an empty directory. Use a function when the
+    payload depends on a snapshot's contents.
+
+  `channels`
+  : Channel names to subscribe to; defaults to all configured channels.
+    Unknown names are rejected.
+
+  `independent`
+  : Defaults to `false`. When true, use APT `all`, RPM `noarch` and Pacman `any`.
+
+  `formats`
+  : Package option overrides indexed by format; defaults to `{ }`.
+
+  `overrides`
+  : Package option overrides indexed by channel; defaults to `{ }`.
+
+  Additional attributes are common `mkPackage` options. Supply `maintainer`,
+  which cannot be inferred from the Nix package.
+
+  # Examples
+
+  ```nix
+  metarepo.mkPublication {
+    inherit repository package;
+    payload = package: metarepo.mkPayload { inherit package; };
+    maintainer = "Example Authors <hello@example.org>";
+    formats.apt.depends = [ "libc6" ];
+    formats.dnf.depends = [ "glibc" ];
+    formats.pacman.depends = [ "glibc" ];
+  }
+  ```
+*/
+{
+  lib,
+  stdenv,
+  emptyDirectory,
+  mkPackage,
+}:
 {
   repository,
   package,
@@ -10,17 +77,35 @@
   ...
 }@args:
 let
-  architectures = if independent then {
-    apt = "all"; dnf = "noarch"; pacman = "any";
-  } else {
-    apt = { x86_64-linux = "amd64"; aarch64-linux = "arm64"; }.${stdenv.hostPlatform.system};
-    dnf = stdenv.hostPlatform.uname.processor;
-    pacman = stdenv.hostPlatform.uname.processor;
-  };
+  architectures =
+    if independent then
+      {
+        apt = "all";
+        dnf = "noarch";
+        pacman = "any";
+      }
+    else
+      {
+        apt =
+          {
+            x86_64-linux = "amd64";
+            aarch64-linux = "arm64";
+          }
+          .${stdenv.hostPlatform.system};
+        dnf = stdenv.hostPlatform.uname.processor;
+        pacman = stdenv.hostPlatform.uname.processor;
+      };
   common = builtins.removeAttrs args [
-    "repository" "package" "payload" "channels" "independent" "formats" "overrides"
+    "repository"
+    "package"
+    "payload"
+    "channels"
+    "independent"
+    "formats"
+    "overrides"
   ];
-  publish = pkg: channel:
+  publish =
+    pkg: channel:
     let
       format = repository.channels.${channel}.format;
       defaults = {
@@ -31,10 +116,22 @@ let
         architecture = architectures.${format};
         payload = if builtins.isFunction payload then payload pkg else payload;
       };
-    in mkPackage (defaults // common // (pkg.passthru.publication or { })
-      // (formats.${format} or { }) // (overrides.${channel} or { }) // { inherit format; });
+    in
+    mkPackage (
+      defaults
+      // common
+      // (pkg.passthru.publication or { })
+      // (formats.${format} or { })
+      // (overrides.${channel} or { })
+      // {
+        inherit format;
+      }
+    );
   packages = builtins.attrValues (package.passthru.snapshots or { current = package; });
 in
+assert lib.assertMsg (lib.all (
+  channel: builtins.hasAttr channel repository.channels
+) channels) "metarepo: publication channels must exist in repository.channels";
 {
   channels = lib.genAttrs channels (channel: map (pkg: publish pkg channel) packages);
 }

@@ -1,0 +1,162 @@
+{
+  "schemaVersion": 1,
+  "groups": [],
+  "entries": [
+    {
+      "id": "metarepo.forPkgs",
+      "attrPath": "metarepo.forPkgs",
+      "name": "forPkgs",
+      "description": "Bind the package and repository builders to a Nixpkgs package set.\nThe builders use that set's overlays, configuration and host platform.\n\n# Type\n\n```\nforPkgs :: AttrSet -> AttrSet\n```\n\n# Inputs\n\n`pkgs`\n: A Nixpkgs package set. Native package builders require Linux.\n\n# Examples\n\n```nix\nmetarepo = inputs.metarepo.lib.forPkgs pkgs;\n# metarepo.mkPackage, mkPublication, mkPayload, mkSnapshots,\n# mkPublic, mkApt, mkDnf and mkPacman are now available.\n```",
+      "groups": [],
+      "source": {
+        "file": "lib/default.nix",
+        "line": 29,
+        "column": 3
+      }
+    },
+    {
+      "id": "metarepo.internal.hooks",
+      "attrPath": "metarepo.internal.hooks",
+      "name": "hooks",
+      "description": "Internal composer for package installation and removal actions.\nEnable actions from declared files, infer dependencies and append custom hooks.\nSysusers runs before tmpfiles, unit reloads and certificate trust refresh.\nNo action enables or starts services or deletes users or service data.\n\n# Type\n\n```\nhooks :: AttrSet -> { depends :: [String], hooks :: AttrSet }\n```\n\n# Inputs\n\n`format`\n: Package format: `apt`, `dnf` or `pacman`.\n\n`certificates`, `systemd`, `refreshCertificates`\n: Integration declarations from `mkPackage`; these inputs are required here.\n\n`hooks`\n: Optional `postInstall` and `postRemove` shell strings; defaults to `{ }`.\n  Other hook names are rejected.\n\n# Examples\n\n```nix\nactions = import ./lib/hooks.nix { inherit lib; } {\n  format = \"apt\";\n  certificates = { };\n  systemd = { };\n  refreshCertificates = true;\n  hooks.postInstall = \"echo refreshed\";\n};\n# actions.depends == [ \"ca-certificates\" ]\n```",
+      "groups": [],
+      "source": {
+        "file": "lib/hooks.nix",
+        "line": 38,
+        "column": 1
+      }
+    },
+    {
+      "id": "metarepo.internal.mkRepository",
+      "attrPath": "metarepo.internal.mkRepository",
+      "name": "mkRepository",
+      "description": "Internal repository builder used by `mkPublic`.\nGenerate APT indexes, RPM metadata and Pacman databases from staged artifacts.\n\n# Type\n\n```\nmkRepository :: AttrSet -> Derivation\n```\n\n# Inputs\n\n`packages`\n: Directory containing per-channel artifacts and an `install.sh`.\n\n`repositories`\n: APT configuration (`suites`, fallback `architectures`, optional\n  `architecturesBySuite`), and lists of `dnf` and `pacman` channel names.\n\n`repository`\n: Repository identity containing `id`, `origin` and `label`.\n\nThe result is unsigned. Its `builder` executable stages a replacement of\n`public/` and uses `GPG_KEY_ID` for signing, including values loaded from `.env`.\n\n# Examples\n\n```nix\npublic = pkgs.callPackage ./lib/mk-repository.nix { } {\n  inherit packages repositories repository;\n};\n```",
+      "groups": [],
+      "source": {
+        "file": "lib/mk-repository.nix",
+        "line": 34,
+        "column": 1
+      }
+    },
+    {
+      "id": "metarepo.internal.packageIntegrations",
+      "attrPath": "metarepo.internal.packageIntegrations",
+      "name": "packageIntegrations",
+      "description": "Internal payload assembler for certificate and systemd resources.\nValidate plain basenames and file extensions, install vendor files and combine\ninferred dependencies and hooks. Preserve the original payload when no files\nare declared.\n\n# Type\n\n```\npackageIntegrations :: AttrSet -> { payload :: Derivation, depends :: [String], hooks :: AttrSet }\n```\n\n# Inputs\n\n`name`\n: Package name, used to prefix certificate filenames.\n\n`format`, `payload`, `certificates`, `systemd`, `refreshCertificates`\n: Required integration inputs as documented in `mkPackage`.\n\n`hooks`\n: Optional custom installation/removal scripts; defaults to `{ }`.\n\nReturn `payload`, `depends` and `hooks` for the native format builder.\n\n# Examples\n\n```nix\nintegration = pkgs.callPackage ./lib/package-integrations.nix { } {\n  name = \"example\";\n  format = \"apt\";\n  payload = pkgs.emptyDirectory;\n  certificates.\"example.crt\" = ./example.crt;\n  systemd = { };\n  refreshCertificates = false;\n};\n```",
+      "groups": [],
+      "source": {
+        "file": "lib/package-integrations.nix",
+        "line": 39,
+        "column": 1
+      }
+    },
+    {
+      "id": "metarepo.mkApt",
+      "attrPath": "metarepo.mkApt",
+      "name": "mkApt",
+      "description": "Build a Debian .deb artifact directly, bypassing declarative integrations.\nPrefer `mkPackage` to infer certificate/systemd dependencies and actions.\n\n# Type\n\n```\nmkApt :: AttrSet -> Derivation\n```\n\n# Inputs\n\n`name`, `version`, `payload`, `architecture`, `description`, `homepage`, `maintainer`, `license`\n: Required native package inputs, as documented in `mkPackage`.\n  Here `payload` is required.\n\n`depends`, `recommends`, `conflicts`, `provides`\n: Optional package-manager dependency lists; each defaults to `[ ]`.\n\n`release`, `hooks`\n: Native revision (default `\"1\"`) and installation/removal scripts\n  (default `{ }`), as documented in `mkPackage`.\n\nReturn a directory containing the artifact and `passthru.metarepo` metadata.\nOnly native metadata and filesystem content are packaged.\n\n# Examples\n\n```nix\nmetarepo.mkApt {\n  name = \"example\";\n  version = \"1.0\";\n  architecture = \"all\";\n  inherit payload;\n  description = \"Example package\";\n  homepage = \"https://example.org\";\n  maintainer = \"Example Authors <hello@example.org>\";\n  license = \"MIT\";\n}\n# Produces \"$out/example_1.0-1_all.deb\".\n```",
+      "groups": [],
+      "source": {
+        "file": "lib/mk-apt.nix",
+        "line": 43,
+        "column": 1
+      }
+    },
+    {
+      "id": "metarepo.mkDnf",
+      "attrPath": "metarepo.mkDnf",
+      "name": "mkDnf",
+      "description": "Build a RPM .rpm artifact directly, bypassing declarative integrations.\nPrefer `mkPackage` to infer certificate/systemd dependencies and actions.\n\n# Type\n\n```\nmkDnf :: AttrSet -> Derivation\n```\n\n# Inputs\n\n`name`, `version`, `payload`, `architecture`, `description`, `homepage`, `maintainer`, `license`\n: Required native package inputs, as documented in `mkPackage`.\n  Here `payload` is required.\n\n`depends`, `recommends`, `conflicts`, `provides`\n: Optional package-manager dependency lists; each defaults to `[ ]`.\n\n`release`, `hooks`\n: Native revision (default `\"1\"`) and installation/removal scripts\n  (default `{ }`), as documented in `mkPackage`.\n\nReturn a directory containing the artifact and `passthru.metarepo` metadata.\nOnly native metadata and filesystem content are packaged.\n\n# Examples\n\n```nix\nmetarepo.mkDnf {\n  name = \"example\";\n  version = \"1.0\";\n  architecture = \"noarch\";\n  inherit payload;\n  description = \"Example package\";\n  homepage = \"https://example.org\";\n  maintainer = \"Example Authors <hello@example.org>\";\n  license = \"MIT\";\n}\n# Produces \"$out/example-1.0-1.noarch.rpm\".\n```",
+      "groups": [],
+      "source": {
+        "file": "lib/mk-dnf.nix",
+        "line": 43,
+        "column": 1
+      }
+    },
+    {
+      "id": "metarepo.mkPackage",
+      "attrPath": "metarepo.mkPackage",
+      "name": "mkPackage",
+      "description": "Build an APT, DNF or Pacman artifact from a native filesystem payload.\nDeclarative certificate and systemd files extend the payload, dependencies\nand hooks before dispatching to the format builder. Hooks run on the target\nmachine, never during the Nix build.\n\nReturn a derivation containing the native package file and\n`passthru.metarepo = { format; architecture; }`.\n\n# Type\n\n```\nmkPackage :: AttrSet -> Derivation\n```\n\n# Inputs\n\n`format`\n: One of `\"apt\"`, `\"dnf\"` or `\"pacman\"`.\n\n`name`, `version`, `architecture`\n: Native package name, upstream version and format-specific architecture.\n\n`description`, `homepage`, `maintainer`, `license`\n: Required metadata strings. `license` is an SPDX identifier; APT accepts\n  it for API consistency but does not write it to the control file.\n\n`payload`\n: Directory laid out as the target filesystem root. Defaults to an empty\n  directory, useful for packages containing only declarative resources.\n\n`depends`, `recommends`, `conflicts`, `provides`\n: Lists of strings in the package manager's syntax; default to `[ ]`.\n  Pacman uses `optdepends` for `recommends`.\n\n`release`\n: Native package revision string; defaults to `\"1\"`.\n\n`certificates`\n: Attribute set from plain `.crt` basenames to PEM source files; defaults\n  to `{ }`. Files are prefixed with the package name and trust is refreshed.\n\n`systemd`\n: Optional `units`, `sysusers` and `tmpfiles` file maps; defaults to `{ }`.\n  Sysusers and tmpfiles basenames must end in `.conf`. Installation creates\n  users, applies tmpfiles and reloads units as needed. Services are not started.\n\n`hooks`\n: Optional shell strings `postInstall` and `postRemove`; defaults to `{ }`.\n  Custom actions run after inferred actions and should be idempotent.\n\n`refreshCertificates`\n: Also refresh trust for certificates in a custom payload; defaults to `false`.\n\n# Examples\n\n```nix\nmetarepo.mkPackage {\n  format = \"apt\";\n  name = \"example-ca\";\n  version = \"1.0\";\n  architecture = \"all\";\n  description = \"Example trust anchor\";\n  homepage = \"https://example.org\";\n  maintainer = \"Example Authors <hello@example.org>\";\n  license = \"MIT\";\n  certificates.\"example.crt\" = ./example.crt;\n}\n```",
+      "groups": [],
+      "source": {
+        "file": "lib/mk-package.nix",
+        "line": 71,
+        "column": 1
+      }
+    },
+    {
+      "id": "metarepo.mkPackages",
+      "attrPath": "metarepo.mkPackages",
+      "name": "mkPackages",
+      "description": "Discover packages and publications using the `packages/<name>` convention.\nEach package needs `package.nix` and a `systems.nix` list. An optional\n`public.nix` receives `package`, `metarepo`, `repository` and Nixpkgs dependencies.\nOnly packages declared for a system are evaluated on that system.\n\nReturn an attribute set indexed by system, suitable for a flake's `packages`.\nSystems with publications also export `build-public`. An empty directory\nreturns `{ }` without evaluating Nixpkgs or repository configuration.\n\n# Type\n\n```\nmkPackages :: AttrSet -> AttrSet\n```\n\n# Inputs\n\n`packagesDir`\n: Path to package directories. `build-public` is a reserved package name.\n\n`repository`\n: Repository identity and channels; see `mkPublic`.\n\n`pkgsFor`\n: Optional function from system name to package set. Defaults to the input's\n  `nixpkgs.legacyPackages`.\n\n`documentation`\n: Optional documentation directory, or function from package set to directory.\n  Defaults to `null`. Its contents are published under `public/doc`.\n\n# Examples\n\n```nix\npackages = metarepo.lib.mkPackages {\n  packagesDir = ./packages;\n  repository = import ./repository.nix;\n  pkgsFor = system: import nixpkgs { inherit system; overlays = [ myOverlay ]; };\n};\n```",
+      "groups": [],
+      "source": {
+        "file": "lib/mk-packages.nix",
+        "line": 43,
+        "column": 1
+      }
+    },
+    {
+      "id": "metarepo.mkPacman",
+      "attrPath": "metarepo.mkPacman",
+      "name": "mkPacman",
+      "description": "Build a Pacman .pkg.tar.zst artifact directly, bypassing declarative integrations.\nPrefer `mkPackage` to infer certificate/systemd dependencies and actions.\n\n# Type\n\n```\nmkPacman :: AttrSet -> Derivation\n```\n\n# Inputs\n\n`name`, `version`, `payload`, `architecture`, `description`, `homepage`, `maintainer`, `license`\n: Required native package inputs, as documented in `mkPackage`.\n  Here `payload` is required.\n\n`depends`, `recommends`, `conflicts`, `provides`\n: Optional package-manager dependency lists; each defaults to `[ ]`.\n\n`release`, `hooks`\n: Native revision (default `\"1\"`) and installation/removal scripts\n  (default `{ }`), as documented in `mkPackage`.\n\nReturn a directory containing the artifact and `passthru.metarepo` metadata.\nOnly native metadata and filesystem content are packaged.\n\n# Examples\n\n```nix\nmetarepo.mkPacman {\n  name = \"example\";\n  version = \"1.0\";\n  architecture = \"any\";\n  inherit payload;\n  description = \"Example package\";\n  homepage = \"https://example.org\";\n  maintainer = \"Example Authors <hello@example.org>\";\n  license = \"MIT\";\n}\n# Produces \"$out/example-1.0-1-any.pkg.tar.zst\".\n```",
+      "groups": [],
+      "source": {
+        "file": "lib/mk-pacman.nix",
+        "line": 43,
+        "column": 1
+      }
+    },
+    {
+      "id": "metarepo.mkPayload",
+      "attrPath": "metarepo.mkPayload",
+      "name": "mkPayload",
+      "description": "Copy selected package trees into a native filesystem layout.\nThis copies files without relocating binaries, wrappers or Nix store references.\nUse a portable build or assemble a custom payload when relocation is needed.\n\n# Type\n\n```\nmkPayload :: AttrSet -> Derivation\n```\n\n# Inputs\n\n`package`\n: Derivation with `pname` and `version`, whose selected trees will be copied.\n\n`paths`\n: Paths relative to the package output; defaults to `[ \"bin\" \"share\" ]`.\n  Each tree is copied by basename; paths must exist.\n\n`prefix`\n: Destination prefix inside the payload; defaults to `\"usr\"`.\n\n# Examples\n\n```nix\nmetarepo.mkPayload { inherit package; paths = [ \"bin\" ]; }\n# Result: $out/usr/bin contains the package's bin tree.\n```",
+      "groups": [],
+      "source": {
+        "file": "lib/mk-payload.nix",
+        "line": 31,
+        "column": 1
+      }
+    },
+    {
+      "id": "metarepo.mkPublic",
+      "attrPath": "metarepo.mkPublic",
+      "name": "mkPublic",
+      "description": "Assemble native artifacts into an unsigned repository and generate its installer.\nConfigured channels without artifacts are omitted. Unknown publication channels,\nmismatched formats, unsafe tokens and ambiguous release selectors are rejected.\n\nReturn a repository derivation. Its `builder` is an executable that replaces\n`public/` in the working directory and optionally signs using `GPG_KEY_ID`\nfrom the environment or `.env`. Its `installScript` is the generated installer.\n\n# Type\n\n```\nmkPublic :: AttrSet -> Derivation\n```\n\n# Inputs\n\n`publications`\n: List of `mkPublication` results. Each `channels.<name>` accepts one\n  artifact or a list. Artifacts need `passthru.metarepo.format` and\n  `architecture`, or a record `{ package; architecture; format; }`.\n  Record metadata can fall back to the package's metadata; record `format`\n  ultimately defaults to the configured channel format.\n\n`repository`\n: Attribute set with `id`, `origin`, `label`, `url` and `channels`.\n  Each channel specifies `format` (`apt`, `dnf` or `pacman`) and optional\n  `releases` (installer aliases, default `[ ]`). The installer also accepts\n  channel names. IDs, published channels, release aliases and architectures\n  must match `[a-zA-Z0-9][a-zA-Z0-9_+-]*`.\n\n`documentation`\n: Optional directory copied under `public/doc`; defaults to `null`.\n  When supplied, the channel name `doc` is reserved.\n\n# Examples\n\n```nix\npublic = metarepo.mkPublic {\n  publications = [ publication ];\n  repository = {\n    id = \"example\";\n    origin = \"Example\";\n    label = \"Example packages\";\n    url = \"https://packages.example.org\";\n    channels.stable = { format = \"apt\"; releases = [ \"ubuntu2404\" ]; };\n  };\n};\n# public.builder generates public/; public itself is an unsigned Nix output.\n```",
+      "groups": [],
+      "source": {
+        "file": "lib/mk-public.nix",
+        "line": 52,
+        "column": 1
+      }
+    },
+    {
+      "id": "metarepo.mkPublication",
+      "attrPath": "metarepo.mkPublication",
+      "name": "mkPublication",
+      "description": "Publish a Nix package, or all its snapshots, to configured repository channels.\nInfer native metadata from `pname`, `version` and `meta`, and infer architecture\nfrom the host platform. APT inference supports x86_64-linux and aarch64-linux.\n\nOptions merge in this order: inferred metadata, common package options,\nsnapshot `passthru.publication`, format options, channel overrides.\nThe repository channel always determines the final format.\n\nReturn `{ channels.<name> = [ artifact ... ]; }` for `mkPublic`.\nWhen `package.passthru.snapshots` exists, every snapshot is published.\n\n# Type\n\n```\nmkPublication :: AttrSet -> AttrSet\n```\n\n# Inputs\n\n`repository`\n: Repository configuration with a `channels` attribute set; see `mkPublic`.\n\n`package`\n: Nix derivation. Inferred metadata uses `pname`, `version`,\n  `meta.description`, `meta.homepage` and `meta.license.spdxId`.\n  Override missing or unsuitable metadata through common package options.\n\n`payload`\n: Native filesystem directory, or function from each snapshot package to\n  its directory. Defaults to an empty directory. Use a function when the\n  payload depends on a snapshot's contents.\n\n`channels`\n: Channel names to subscribe to; defaults to all configured channels.\n  Unknown names are rejected.\n\n`independent`\n: Defaults to `false`. When true, use APT `all`, RPM `noarch` and Pacman `any`.\n\n`formats`\n: Package option overrides indexed by format; defaults to `{ }`.\n\n`overrides`\n: Package option overrides indexed by channel; defaults to `{ }`.\n\nAdditional attributes are common `mkPackage` options. Supply `maintainer`,\nwhich cannot be inferred from the Nix package.\n\n# Examples\n\n```nix\nmetarepo.mkPublication {\n  inherit repository package;\n  payload = package: metarepo.mkPayload { inherit package; };\n  maintainer = \"Example Authors <hello@example.org>\";\n  formats.apt.depends = [ \"libc6\" ];\n  formats.dnf.depends = [ \"glibc\" ];\n  formats.pacman.depends = [ \"glibc\" ];\n}\n```",
+      "groups": [],
+      "source": {
+        "file": "lib/mk-publication.nix",
+        "line": 63,
+        "column": 1
+      }
+    },
+    {
+      "id": "metarepo.mkSnapshots",
+      "attrPath": "metarepo.mkSnapshots",
+      "name": "mkSnapshots",
+      "description": "Build named snapshots and return the selected default package.\nAttach every built package under `passthru.snapshots`, and attach each\nsnapshot's native publication options under `passthru.publication`.\nExisting passthru attributes are preserved.\n\n# Type\n\n```\nmkSnapshots :: AttrSet -> Derivation\n```\n\n# Inputs\n\n`snapshots`\n: Attribute set of snapshot records. Records contain source fields such as\n  `rev` and `hash`, arbitrary build options, and optional `publication`.\n\n`default`\n: Name of the snapshot returned for Nix users. Must exist in `snapshots`.\n\n`source`\n: Function receiving the entire snapshot record and returning its source.\n\n`build`\n: Function receiving the snapshot minus `rev`, `hash` and `publication`,\n  plus `src = source snapshot`. Must return a derivation with `overrideAttrs`.\n\n# Examples\n\n```nix\nmetarepo.mkSnapshots {\n  snapshots.release = { version = \"1.0\"; rev = \"immutable-commit\"; hash = sourceHash; };\n  default = \"release\";\n  source = snapshot: fetchurl {\n    url = \"https://example.org/archive/${snapshot.rev}.tar.gz\";\n    inherit (snapshot) hash;\n  };\n  build = { version, src }: stdenv.mkDerivation {\n    pname = \"example\";\n    inherit version src;\n  };\n}\n```",
+      "groups": [],
+      "source": {
+        "file": "lib/mk-snapshots.nix",
+        "line": 46,
+        "column": 1
+      }
+    }
+  ]
+}
