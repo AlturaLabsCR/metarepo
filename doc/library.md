@@ -41,30 +41,143 @@ no flake changes are needed. The helper exports it under its directory name.
 An empty packages directory produces `{ }`. `build-public` is only exported
 on systems with at least one `public.nix`, and that name is reserved.
 
-An optional `public.nix` receives `package` and `metarepo`, alongside normal
-`callPackage` dependencies. Its only required interface is the returned
-`{ channels = { ... }; }` set. The `mkApt`, `mkDnf`, and `mkPacman` builders are
-conveniences; a package can instead build archives however it needs and declare
-them directly:
+An optional `public.nix` receives `package`, `metarepo`, and `repository`,
+alongside normal `callPackage` dependencies. Use `mkPublication` to create
+artifacts for the repository's configured channels:
 
 ```nix
-{ customDeb }:
-{
-  channels.stable = {
-    architecture = "amd64";
-    package = customDeb; # A derivation containing valid .deb package files.
-  };
+{ metarepo, repository, package }:
+metarepo.mkPublication {
+  inherit repository package;
+  payload = metarepo.mkPayload { inherit package; };
+  maintainer = "Example Authors <hello@example.invalid>";
+  formats.apt.depends = [ "libc6" ];
+  formats.dnf.depends = [ "glibc" ];
+  formats.pacman.depends = [ "glibc" ];
 }
 ```
 
-When using a Metarepo builder, the channel can omit `format` and `architecture`;
-the builder records them on its derivation. Custom derivations can either
-provide the same `passthru.metarepo` metadata or declare `architecture` on the
-channel as above. The format defaults to the configured channel format; an
-explicit format or builder metadata must match it. The C and Python packages
-show the convenience pattern; each package owns its `public.nix` and can replace
-it with its own composition.
-A package without `public.nix` remains usable through Nix.
+`mkPublication` reads the name, version, description, homepage, and SPDX license
+from the Nix package. It derives architecture names from the host platform
+(APT supports x86_64 and aarch64), or uses `independent = true` for architecture-independent
+payloads. Common package options are passed through to `mkPackage`.
+Use `channels = [ "noble" "fedora" ];` to select channels, `formats.<format>`
+for format-specific options, and `overrides.<channel>` for channel-specific
+options. Options are merged in this order: inferred metadata, common options,
+snapshot publication options, format options, channel overrides. The configured
+channel always determines the format.
+
+`mkPayload { package; paths ? [ "bin" "share" ]; prefix ? "usr"; }` copies
+selected directories into a native filesystem layout. It does not relocate
+binaries, wrappers or Nix store dependencies. Use a portable build, or provide a
+custom payload. The Python example assembles its source and system interpreter
+launcher explicitly. Fastfetch uses a static musl build with optional graphical
+integrations disabled. A package without `public.nix` remains usable through Nix.
+
+`mkPublication` returns channel lists and automatically publishes every snapshot
+when `package.passthru.snapshots` exists. `mkPublic` accepts a single artifact or
+a list for each channel. Custom builders can return records directly:
+
+```nix
+{ customDeb }:
+{ channels.stable = { architecture = "amd64"; package = customDeb; }; }
+```
+
+Builder derivations record `format` and `architecture` in `passthru.metarepo`.
+Custom records may omit `format`; it defaults to the channel's configured format.
+Explicit formats must match the channel.
+
+## Declarative system integration
+
+Declare files alongside the package options, in `mkPackage` or `mkPublication`:
+
+```nix
+certificates."company.crt" = ./company.crt;
+systemd = {
+  units."example.service" = ./example.service;
+  sysusers."example.conf" = ./sysusers.conf;
+  tmpfiles."example.conf" = ./tmpfiles.conf;
+};
+```
+
+Values are source files (Nix paths or file derivations such as `writeText`).
+Keys are plain file basenames; sysusers/tmpfiles names must end in `.conf`.
+The library adds them to the payload and infers dependencies and installation
+scripts from the declarations. The payload is optional for packages consisting
+only of these resources. No boolean flags are needed to activate their actions.
+Each action runs once per package event, regardless of how many files it installs.
+Explicit `refreshCertificates = true` remains supported for custom payloads.
+
+Certificates must have `.crt` names and contain one PEM certificate per file.
+Names are prefixed with the package name to avoid clashes. APT uses
+`/usr/local/share/ca-certificates`, DNF `/usr/share/pki/ca-trust-source/anchors`,
+and Pacman `/usr/share/ca-certificates/trust-source/anchors`. Trust is refreshed
+on installation, upgrades and removal. Dependencies are `ca-certificates` for
+APT/DNF and `ca-certificates-utils` for Pacman. These paths and refresh commands
+follow the [Debian certificate documentation](https://manpages.debian.org/unstable/ca-certificates/update-ca-certificates.8.en.html)
+and [Arch trust documentation](https://man.archlinux.org/man/update-ca-trust.8).
+
+Systemd declarations install vendor files under `/usr/lib/systemd/system`,
+`/usr/lib/sysusers.d`, and `/usr/lib/tmpfiles.d`, and add a `systemd` dependency.
+On installation and upgrades, sysusers creates the declared users, then tmpfiles
+creates directories/files, and unit installation reloads the systemd manager.
+Only the package's configuration basenames are passed to sysusers/tmpfiles,
+allowing administrator overrides in `/etc` to take precedence. Removal reloads
+the manager after units disappear; users and service data remain.
+Reload is skipped when systemd is not running (for example in an offline root).
+The library does not enable, start, restart or stop services automatically.
+See [systemd-tmpfiles](https://www.freedesktop.org/software/systemd/man/systemd-tmpfiles.html).
+
+Raw `hooks.postInstall` and `hooks.postRemove` remain available for custom shell
+actions and run after the inferred actions. The declarative options describe
+what the package installs; hooks describe actions on the target system.
+The library centralizes action selection, dependencies and hook composition in
+`lib/hooks.nix`; `lib/package-integrations.nix` handles file layout and installation.
+
+## Installation hooks
+
+The generic package interface is `mkPackage { format; ...; }`. It dispatches to
+APT, DNF or Pacman and accepts `hooks.postInstall` and `hooks.postRemove`, both
+shell script strings running on the target system. For example, add these options
+to `mkPublication`:
+
+```nix
+refreshCertificates = true;
+hooks.postInstall = "echo 'Certificates installed'";
+```
+
+`refreshCertificates` adds the certificate tooling to dependencies and refreshes
+trust on installation, upgrades and removal using `update-ca-certificates` for
+APT and `update-ca-trust extract` for DNF/Pacman. Put certificates in the target
+format's trust input directory; the helper does not move them. Custom hooks run
+after the refresh. APT hooks run only for configure and remove/purge events;
+RPM uses `%post`/`%postun`; Pacman uses `post_install`, `post_upgrade` and
+`post_remove`. Hooks should be idempotent; each package manager controls failure
+handling. No hooks run while building the Nix derivation.
+
+## Snapshots by commit
+
+`mkSnapshots { snapshots; default; source; build; }` creates the default Nix
+package with all versions available under `passthru.snapshots`. `source` receives
+the snapshot record (including `rev` and `hash`); `build` receives its other build
+options plus the fetched `src`. A snapshot's optional `publication` record
+supplies native package options for that version, such as `depends`, `recommends`,
+`release`, or hooks. The helper imposes no upstream or build-system convention.
+
+See `packages/fastfetch/snapshots.nix` and `packages/fastfetch-git/snapshots.nix`:
+add a named record with a unique `version`, immutable commit `rev`, archive hash,
+build options, and publication options. Change `default` in `package.nix` to select
+the version exported for Nix users. All snapshots are published to subscribed
+channels. These deliberately historical examples use two release commits and
+two development commits; they demonstrate pinning rather than tracking latest releases.
+
+The examples use flat archive hashes from `fetchurl`. Compute a new hash with
+`nix store prefetch-file --json https://codeload.github.com/fastfetch-cli/fastfetch/tar.gz/<commit>`.
+The shared Fastfetch build recipe belongs to the example; snapshot orchestration,
+filesystem layout, channel selection and package hooks belong to the library.
+`fastfetch-git` provides `fastfetch`; the two packages conflict because they
+install the same executable. Their static builds vary threading options and
+recommended runtime tools by snapshot.
 
 ## Project configuration
 
@@ -111,13 +224,16 @@ code.
 
 For projects with a different layout, use `metarepo.lib.forPkgs pkgs`. It exposes:
 
-- `mkApt`, `mkDnf`, `mkPacman`: functions taking `name`, `version`, `payload`,
-  `architecture`, `description`, `homepage`, `maintainer`, `license`,
-  optional `depends` and `recommends` (both default to `[]`), and optional
-  `release` (default `"1"`).
-  `recommends` maps to APT `Recommends`, RPM `Recommends`, and pacman
-  `optdepends`. `payload` is a derivation with a native
-  filesystem tree such as `usr/bin/`, not a Nix store closure.
+- `mkPackage`: takes `format` (`"apt"`, `"dnf"`, `"pacman"`), `name`,
+  `version`, `architecture`, `description`, `homepage`, `maintainer`,
+  `license`, optional `depends`, `recommends`, `conflicts`, `provides` (lists),
+  `release` (default `"1"`), optional `payload` (empty by default), `certificates`,
+  `systemd`, `hooks` and `refreshCertificates`.
+  Dependency strings use the selected format's syntax. `recommends` maps to APT/RPM
+  `Recommends` and Pacman `optdepends`.
+- `mkPublication`, `mkPayload`, `mkSnapshots`: the composition helpers above.
+- `mkApt`, `mkDnf`, `mkPacman`: retained for existing consumers; new code should
+  use `mkPackage` or `mkPublication` to share behavior across formats.
 - `mkPublic { publications; repository; }`: an unsigned repository derivation.
   Its `builder` attribute is the executable derivation that generates `public/`
   in the working directory, with optional signing through `GPG_KEY_ID`.

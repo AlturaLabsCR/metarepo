@@ -4,11 +4,11 @@ Reusable Nix library and project template for building APT, DNF and Pacman
 package repositories.
 
 Use `lib.mkPackages` to export packages and the repository builder from another
-flake, or `lib.forPkgs` for individual native package builders. See
-[the library API and template guide](doc/library.md). Platforms and distribution aliases live
-in `packages/`; adding packages or releases requires no changes elsewhere.
+flake, or `lib.forPkgs` for `mkPublication` and `mkPackage`. See
+[the library API and template guide](doc/library.md). Platforms live in `packages/` and distribution aliases in `repository.nix`; adding packages or releases requires no changes elsewhere.
 
-The example packages are `metarepo-hello-c` and `metarepo-hello-python`.
+The examples include C, Python, `fastfetch` and `fastfetch-git`. Fastfetch
+snapshots pin commits and hashes, with build options and dependencies per version.
 
 ## Build
 
@@ -21,6 +21,12 @@ nix run .#build-public
 
 This generates the repository in `public/`, including `install.sh`. Set
 `GPG_KEY_ID` to sign packages and repository metadata.
+
+## Staging validation
+
+The **Validate staging repository** workflow runs on pushes to `staging`, pull
+requests targeting `main` or `staging`, and manual runs. It checks that
+`nix run .#build-public` successfully generates `public/`.
 
 ## Publish
 
