@@ -135,10 +135,11 @@ systemd = {
 sysusers/tmpfiles names must end in <code>.conf</code>. The library adds
 them to the payload and infers dependencies and installation scripts
 from the declarations. The payload is optional for packages consisting
-only of these resources. No boolean flags are needed to activate their
-actions. Each action runs once per package event, regardless of how many
-files it installs. Explicit <code>refreshCertificates = true</code>
-remains supported for custom payloads.</p>
+only of these resources. File declarations activate resource setup
+without extra flags. Each action runs once per package event, regardless
+of how many files it installs. Explicit
+<code>refreshCertificates = true</code> remains supported for custom
+payloads.</p>
 <p>Certificates must have <code>.crt</code> names and contain one PEM
 certificate per file. Names are prefixed with the package name to avoid
 clashes. APT uses <code>/usr/local/share/ca-certificates</code>, DNF
@@ -156,8 +157,9 @@ documentation</a>.</p>
 <code>/usr/lib/systemd/system</code>, <code>/usr/lib/sysusers.d</code>,
 and <code>/usr/lib/tmpfiles.d</code>, and add a <code>systemd</code>
 dependency. On installation and upgrades, sysusers creates the declared
-users, then tmpfiles creates directories/files, and unit installation
-reloads the systemd manager. Only the package’s configuration basenames
+users, then tmpfiles creates directories/files, certificate declarations
+refresh trust, and unit installation reloads the systemd manager before
+requesting service actions. Only the package’s configuration basenames
 are passed to sysusers/tmpfiles, allowing administrator overrides in
 <code>/etc</code> to take precedence. Removal reloads the manager after
 units disappear; users and service data remain. Reload is skipped when

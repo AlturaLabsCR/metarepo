@@ -114,7 +114,7 @@ Values are source files (Nix paths or file derivations such as `writeText`).
 Keys are plain file basenames; sysusers/tmpfiles names must end in `.conf`.
 The library adds them to the payload and infers dependencies and installation
 scripts from the declarations. The payload is optional for packages consisting
-only of these resources. No boolean flags are needed to activate their actions.
+only of these resources. File declarations activate resource setup without extra flags.
 Each action runs once per package event, regardless of how many files it installs.
 Explicit `refreshCertificates = true` remains supported for custom payloads.
 
@@ -130,7 +130,8 @@ and [Arch trust documentation](https://man.archlinux.org/man/update-ca-trust.8).
 Systemd declarations install vendor files under `/usr/lib/systemd/system`,
 `/usr/lib/sysusers.d`, and `/usr/lib/tmpfiles.d`, and add a `systemd` dependency.
 On installation and upgrades, sysusers creates the declared users, then tmpfiles
-creates directories/files, and unit installation reloads the systemd manager.
+creates directories/files, certificate declarations refresh trust, and unit
+installation reloads the systemd manager before requesting service actions.
 Only the package's configuration basenames are passed to sysusers/tmpfiles,
 allowing administrator overrides in `/etc` to take precedence. Removal reloads
 the manager after units disappear; users and service data remain.

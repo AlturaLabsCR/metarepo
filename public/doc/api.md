@@ -30,7 +30,7 @@ metarepo = inputs.metarepo.lib.forPkgs pkgs;
 
 Internal composer for package installation and removal actions.
 Enable actions from declared files, infer dependencies and append custom hooks.
-Sysusers runs before tmpfiles, unit reloads and certificate trust refresh.
+Sysusers runs before tmpfiles, certificate trust refresh and unit lifecycle actions.
 Unit lifecycle options explicitly request enable/start/restart/stop actions.
 Users and service data are preserved.
 

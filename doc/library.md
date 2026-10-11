@@ -114,7 +114,7 @@ Values are source files (Nix paths or file derivations such as `writeText`).
 Keys are plain file basenames; sysusers/tmpfiles names must end in `.conf`.
 The library adds them to the payload and infers dependencies and installation
 scripts from the declarations. The payload is optional for packages consisting
-only of these resources. No boolean flags are needed to activate their actions.
+only of these resources. File declarations activate resource setup without extra flags.
 Each action runs once per package event, regardless of how many files it installs.
 Explicit `refreshCertificates = true` remains supported for custom payloads.
 
