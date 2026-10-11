@@ -16,6 +16,9 @@
   maintainer,
   recommends ? [ ],
   release ? "1",
+  hooks ? { },
+  conflicts ? [ ],
+  provides ? [ ],
 }:
 let
   spec = writeText "${name}.spec" ''
@@ -31,6 +34,9 @@ let
     ${lib.concatMapStringsSep "\n" (dep: "Requires: ${dep}") depends}
     ${lib.concatMapStringsSep "\n" (dep: "Recommends: ${dep}") recommends}
 
+    ${lib.concatMapStringsSep "\n" (dep: "Conflicts: ${dep}") conflicts}
+    ${lib.concatMapStringsSep "\n" (dep: "Provides: ${dep}") provides}
+
     %description
     ${description}
 
@@ -39,6 +45,9 @@ let
     cp -R ${payload}/. %{buildroot}/
 
     %files -f %{_topdir}/filelist
+
+    ${lib.optionalString ((hooks.postInstall or "") != "") ("%post\n" + hooks.postInstall)}
+    ${lib.optionalString ((hooks.postRemove or "") != "") ("%postun\n" + hooks.postRemove)}
   '';
 in
 runCommand "${name}-rpm-${version}"

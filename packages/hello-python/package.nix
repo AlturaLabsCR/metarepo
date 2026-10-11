@@ -15,9 +15,4 @@ python3Packages.buildPythonApplication {
     mainProgram = "metarepo-hello-python";
     platforms = import ./systems.nix;
   };
-  passthru.packageArchitectures = {
-    apt = "all";
-    dnf = "noarch";
-    pacman = "any";
-  };
 }

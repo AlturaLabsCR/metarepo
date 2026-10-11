@@ -28,19 +28,4 @@ stdenv.mkDerivation {
     mainProgram = "metarepo-hello-c";
     platforms = import ./systems.nix;
   };
-  passthru.packageArchitectures =
-    if stdenv.hostPlatform.system == "aarch64-linux" then
-      {
-        apt = "arm64";
-        dnf = "aarch64";
-        pacman = "aarch64";
-      }
-    else if stdenv.hostPlatform.system == "x86_64-linux" then
-      {
-        apt = "amd64";
-        dnf = "x86_64";
-        pacman = "x86_64";
-      }
-    else
-      throw "metarepo-hello-c has no package architecture mapping for ${stdenv.hostPlatform.system}";
 }

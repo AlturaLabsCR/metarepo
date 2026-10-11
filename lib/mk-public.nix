@@ -21,7 +21,7 @@ let
   channel =
     name:
     let
-      entries = map (publication: normalizeEntry name publication.channels.${name}) (
+      entries = lib.concatMap (publication: map (normalizeEntry name) (lib.toList publication.channels.${name})) (
         lib.filter (publication: builtins.hasAttr name publication.channels) publications
       );
       format = repository.channels.${name}.format;

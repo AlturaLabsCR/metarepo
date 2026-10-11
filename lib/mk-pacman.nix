@@ -28,8 +28,12 @@
   maintainer,
   recommends ? [ ],
   release ? "1",
+  hooks ? { },
+  conflicts ? [ ],
+  provides ? [ ],
 }:
 let
+  hasHooks = lib.any (script: script != "") (builtins.attrValues hooks);
   pkgbuild = writeText "PKGBUILD" ''
     pkgname=${lib.escapeShellArg name}
     pkgver=${lib.escapeShellArg version}
@@ -40,6 +44,9 @@ let
     license=(${lib.escapeShellArg license})
     depends=(${lib.concatMapStringsSep " " lib.escapeShellArg depends})
     optdepends=(${lib.concatMapStringsSep " " lib.escapeShellArg recommends})
+    ${lib.optionalString hasHooks "install=hooks.install"}
+    conflicts=(${lib.concatMapStringsSep " " lib.escapeShellArg conflicts})
+    provides=(${lib.concatMapStringsSep " " lib.escapeShellArg provides})
     source=()
     sha256sums=()
 
@@ -49,6 +56,17 @@ let
       # Nix store directories are read-only; restore owner write permission
       # in the staging tree before makepkg records the package's modes.
       find "$pkgdir" -type d -exec chmod u+w {} +
+    }
+  '';
+  installScript = writeText "hooks.install" ''
+    post_install() {
+      ${hooks.postInstall or ""}
+      :
+    }
+    post_upgrade() { post_install "$@"; }
+    post_remove() {
+      ${hooks.postRemove or ""}
+      :
     }
   '';
   makepkgConf = writeText "makepkg.conf" ''
@@ -102,6 +120,7 @@ runCommand "${name}-arch-${version}"
   ''
     mkdir -p "$out" build src log /tmp/pacman-db /tmp/pacman-cache
     cp ${pkgbuild} PKGBUILD
+    ${lib.optionalString hasHooks "cp ${installScript} hooks.install"}
     PATH=${pacmanTools}/bin:$PATH makepkg --config ${makepkgConf} --nodeps --noconfirm --skipchecksums --nosign
     test -n "$(find "$out" -type f -name '*.pkg.tar.zst' -print -quit)"
   ''

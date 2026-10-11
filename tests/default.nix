@@ -68,6 +68,7 @@ let
         };
       }).drvPath;
 in
+assert import ./api.nix { inherit pkgs api repository; };
 assert empty == { };
 assert
   builtins.attrNames nativeOnly == [
@@ -96,35 +97,8 @@ assert !(builtins.tryEval (api.mkPublic {
     sh ${./apt-multiversion.sh} ${../lib/repository.sh}
     touch "$out"
   '';
-  native-packages =
-    let
-      common = {
-        name = "test-native";
-        version = "1.0";
-        payload = pkgs.runCommand "test-payload" { } ''
-          mkdir -p "$out/usr/share/test-native"
-          echo hello > "$out/usr/share/test-native/hello"
-        '';
-        description = "Test native packaging defaults";
-        homepage = "https://example.invalid";
-        maintainer = "Test <test@example.invalid>";
-        license = "MIT";
-      };
-      apt = api.mkApt (common // { architecture = "all"; });
-      dnf = api.mkDnf (common // { architecture = "noarch"; });
-      pacman = api.mkPacman (common // { architecture = "any"; });
-    in
-    pkgs.runCommand "native-package-tests" {
-      nativeBuildInputs = [ pkgs.dpkg pkgs.rpm pkgs.libarchive ];
-    } ''
-      test "$(dpkg-deb -f ${apt}/*.deb Package)" = test-native
-      test -z "$(dpkg-deb -f ${apt}/*.deb Depends)"
-      test "$(rpm -qp --qf '%{NAME}' ${dnf}/*.rpm)" = test-native
-      bsdtar -xOf ${pacman}/*.pkg.tar.zst .PKGINFO > pkginfo
-      grep -q '^pkgname = test-native$' pkginfo
-      if grep -q '^depend = ' pkginfo; then exit 1; fi
-      touch "$out"
-    '';
+  integrations = import ./integrations.nix { inherit pkgs; };
+  native-packages = import ./native-packages.nix { inherit pkgs api; };
   installer = pkgs.runCommand "installer-tests" { } ''
         sh -n ${public.installScript}
         # Source only the definitions; never run package managers or alter /etc.

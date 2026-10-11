@@ -4,11 +4,15 @@ let
 in
 rec {
   # Bind the builders to the consumer's package set (including its overlays).
-  forPkgs = pkgs: {
+  forPkgs = pkgs: rec {
     mkApt = pkgs.callPackage ./mk-apt.nix { };
     mkDnf = pkgs.callPackage ./mk-dnf.nix { };
     mkPacman = pkgs.callPackage ./mk-pacman.nix { };
     mkPublic = pkgs.callPackage ./mk-public.nix { };
+    mkPackage = pkgs.callPackage ./mk-package.nix { inherit mkApt mkDnf mkPacman; };
+    mkPublication = pkgs.callPackage ./mk-publication.nix { inherit mkPackage; };
+    mkPayload = pkgs.callPackage ./mk-payload.nix { };
+    mkSnapshots = pkgs.callPackage ./mk-snapshots.nix { };
   };
 
   # Convenience API for projects following the packages/<name> convention.
@@ -34,17 +38,17 @@ rec {
         metarepo = forPkgs pkgs;
         available = lib.filterAttrs (_: systems: builtins.elem system systems) packageSystems;
         packages = lib.mapAttrs (
-          name: _: pkgs.callPackage (packagesDir + "/${name}/package.nix") { }
+          name: _: lib.callPackageWith (pkgs // { inherit metarepo; }) (packagesDir + "/${name}/package.nix") { }
         ) available;
         publicNames = lib.filter (name: builtins.pathExists (packagesDir + "/${name}/public.nix")) (
           builtins.attrNames packages
         );
         publications = map (
           name:
-          pkgs.callPackage (packagesDir + "/${name}/public.nix") {
-            inherit metarepo;
+          lib.callPackageWith (pkgs // {
+            inherit metarepo repository;
             package = packages.${name};
-          }
+          }) (packagesDir + "/${name}/public.nix") { }
         ) publicNames;
         public = metarepo.mkPublic { inherit publications repository; };
       in
