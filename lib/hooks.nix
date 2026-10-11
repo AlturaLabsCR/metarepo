@@ -1,7 +1,7 @@
 /**
   Internal composer for package installation and removal actions.
   Enable actions from declared files, infer dependencies and append custom hooks.
-  Sysusers runs before tmpfiles, unit reloads and certificate trust refresh.
+  Sysusers runs before tmpfiles, certificate trust refresh and unit lifecycle actions.
   Unit lifecycle options explicitly request enable/start/restart/stop actions.
   Users and service data are preserved.
 
@@ -61,16 +61,16 @@ let
   actions = lib.filter (action: action.enabled) [
     (configuration "sysusers" "systemd-sysusers" [ ])
     (configuration "tmpfiles" "systemd-tmpfiles" [ "--create" ])
-    (import ./systemd-units.nix { inherit lib; } {
-      inherit format;
-      units = systemd.units or { };
-    })
     {
       enabled = certificates != { } || refreshCertificates;
       depends = [ (if format == "pacman" then "ca-certificates-utils" else "ca-certificates") ];
       postInstall = refresh;
       postRemove = refresh;
     }
+    (import ./systemd-units.nix { inherit lib; } {
+      inherit format;
+      units = systemd.units or { };
+    })
   ];
   events = [
     "postInstall"

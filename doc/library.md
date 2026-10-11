@@ -130,7 +130,8 @@ and [Arch trust documentation](https://man.archlinux.org/man/update-ca-trust.8).
 Systemd declarations install vendor files under `/usr/lib/systemd/system`,
 `/usr/lib/sysusers.d`, and `/usr/lib/tmpfiles.d`, and add a `systemd` dependency.
 On installation and upgrades, sysusers creates the declared users, then tmpfiles
-creates directories/files, and unit installation reloads the systemd manager.
+creates directories/files, certificate declarations refresh trust, and unit
+installation reloads the systemd manager before requesting service actions.
 Only the package's configuration basenames are passed to sysusers/tmpfiles,
 allowing administrator overrides in `/etc` to take precedence. Removal reloads
 the manager after units disappear; users and service data remain.

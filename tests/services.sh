@@ -5,12 +5,13 @@ format=$1
 package=$2
 mkdir bin
 export CALLS="$PWD/calls" ACTIVE=no FAIL_ACTIONS=no
-for tool in systemctl deb-systemd-helper deb-systemd-invoke; do
+for tool in systemctl deb-systemd-helper deb-systemd-invoke update-ca-certificates update-ca-trust; do
   cat > "bin/$tool" <<'SH'
 #!/bin/sh
 printf '%s:%s\n' "${0##*/}" "$*" >> "$CALLS"
-case "$*" in
-  is-active*) [ "$ACTIVE" = yes ] ;;
+case "${0##*/}:$*" in
+  systemctl:is-active*) [ "$ACTIVE" = yes ] ;;
+  update-ca-*) exit 0 ;;
   *) [ "$FAIL_ACTIONS" = no ] ;;
 esac
 SH
@@ -76,6 +77,8 @@ mkdir manager
 install_event
 grep -Fx "$boot:enable example.service" "$CALLS"
 grep -Fx "$runtime:start example.service leave-running.service" "$CALLS"
+test "$(grep -n '^update-ca-' "$CALLS" | cut -d : -f 1)" \
+  -lt "$(grep -n "^$runtime:start " "$CALLS" | cut -d : -f 1)"
 test "$(tail -n 1 "$CALLS")" = custom:install
 if grep -q 'manual.service\|source-only.service' "$CALLS"; then exit 1; fi
 

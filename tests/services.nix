@@ -17,6 +17,7 @@ let
       homepage = "https://example.invalid";
       maintainer = "Test";
       license = "MIT";
+      certificates."example.crt" = pkgs.writeText "example.crt" "test certificate";
       systemd.units = {
         "example.service" = {
           source = unit;
