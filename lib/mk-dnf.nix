@@ -88,8 +88,28 @@ let
 
     %files -f %{_topdir}/filelist
 
-    ${lib.optionalString ((hooks.postInstall or "") != "") ("%post\n" + hooks.postInstall)}
-    ${lib.optionalString ((hooks.postRemove or "") != "") ("%postun\n" + hooks.postRemove)}
+    ${lib.optionalString ((hooks.postInstall or "") != "") ''
+      %post
+      METAREPO_ACTION=install
+      if [ "$1" -gt 1 ]; then METAREPO_ACTION=upgrade; fi
+      ${hooks.postInstall}
+    ''}
+    ${lib.optionalString ((hooks.preRemove or "") != "") ''
+      %preun
+      if [ "$1" -eq 0 ]; then
+        METAREPO_ACTION=remove
+        ${hooks.preRemove}
+        :
+      fi
+    ''}
+    ${lib.optionalString ((hooks.postRemove or "") != "") ''
+      %postun
+      if [ "$1" -eq 0 ]; then
+        METAREPO_ACTION=remove
+        ${hooks.postRemove}
+        :
+      fi
+    ''}
   '';
 in
 runCommand "${name}-rpm-${version}"

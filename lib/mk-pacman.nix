@@ -101,12 +101,19 @@ let
     }
   '';
   installScript = writeText "hooks.install" ''
-    post_install() {
+    _metarepo_post_install() {
       ${hooks.postInstall or ""}
       :
     }
-    post_upgrade() { post_install "$@"; }
+    post_install() { METAREPO_ACTION=install _metarepo_post_install "$@"; }
+    post_upgrade() { METAREPO_ACTION=upgrade _metarepo_post_install "$@"; }
+    pre_remove() {
+      METAREPO_ACTION=remove
+      ${hooks.preRemove or ""}
+      :
+    }
     post_remove() {
+      METAREPO_ACTION=remove
       ${hooks.postRemove or ""}
       :
     }

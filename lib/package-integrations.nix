@@ -19,7 +19,10 @@
   : Required integration inputs as documented in `mkPackage`.
 
   `hooks`
-  : Optional custom installation/removal scripts; defaults to `{ }`.
+  : Optional `postInstall`, `preRemove` and `postRemove` scripts; defaults to `{ }`.
+
+  Unit entries accept source files or records with explicit lifecycle options;
+  `systemd-units.nix` validates them and supplies their source file map.
 
   Return `payload`, `depends` and `hooks` for the native format builder.
 
@@ -47,6 +50,10 @@
   hooks ? { },
 }:
 let
+  units = import ./systemd-units.nix { inherit lib; } {
+    inherit format;
+    units = systemd.units or { };
+  };
   actions = import ./hooks.nix { inherit lib; } {
     inherit
       format
@@ -70,7 +77,7 @@ let
     }
     {
       directory = "usr/lib/systemd/system";
-      files = systemd.units or { };
+      files = units.files;
     }
     {
       directory = "usr/lib/sysusers.d";

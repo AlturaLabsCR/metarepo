@@ -84,25 +84,42 @@ let
       ]
     )
   );
-  hookScripts =
-    lib.mapAttrs (event: script: writeText event ("#!/bin/sh\nset -eu\n" + script + "\n"))
-      {
-        postinst = ''
-          if [ "$1" = configure ]; then
-            ${hooks.postInstall or ""}
-            :
-          fi
-        '';
-        postrm = ''
-          case "$1" in remove|purge)
-            ${hooks.postRemove or ""}
-            : ;;
-          esac
-        '';
-      };
-  scripts = lib.filterAttrs (
-    event: _: (hooks.${if event == "postinst" then "postInstall" else "postRemove"} or "") != ""
-  ) hookScripts;
+  hookScripts = {
+    postinst = {
+      event = "postInstall";
+      script = ''
+        if [ "''${1:-}" = configure ]; then
+          METAREPO_ACTION=install
+          if [ -n "''${2:-}" ]; then METAREPO_ACTION=upgrade; fi
+          ${hooks.postInstall or ""}
+          :
+        fi
+      '';
+    };
+    prerm = {
+      event = "preRemove";
+      script = ''
+        if [ "''${1:-}" = remove ]; then
+          METAREPO_ACTION=remove
+          ${hooks.preRemove or ""}
+          :
+        fi
+      '';
+    };
+    postrm = {
+      event = "postRemove";
+      script = ''
+        case "''${1:-}" in remove|purge)
+          METAREPO_ACTION=$1
+          ${hooks.postRemove or ""}
+          : ;;
+        esac
+      '';
+    };
+  };
+  scripts = lib.mapAttrs (
+    event: hook: writeText event ("#!/bin/sh\nset -eu\n" + hook.script + "\n")
+  ) (lib.filterAttrs (_: hook: (hooks.${hook.event} or "") != "") hookScripts);
 in
 runCommand "${name}-deb-${version}"
   {

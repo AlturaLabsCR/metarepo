@@ -1,7 +1,7 @@
 # Use Metarepo as a library
 
 See the [generated function reference](../public/doc/api.md) for types, arguments
-and examples, and the [maintainability review](review.md) for recommendations.
+and examples.
 
 Add Metarepo as a flake input. Your project owns `packages/` and the repository
 identity and channel/release configuration in `repository.nix`; you do not
@@ -135,19 +135,48 @@ Only the package's configuration basenames are passed to sysusers/tmpfiles,
 allowing administrator overrides in `/etc` to take precedence. Removal reloads
 the manager after units disappear; users and service data remain.
 Reload is skipped when systemd is not running (for example in an offline root).
-The library does not enable, start, restart or stop services automatically.
+Plain unit source files only install the unit. To request lifecycle actions,
+use a record for that unit:
+
+```nix
+systemd.units."example.service" = {
+  source = ./example.service;
+  enable = true;
+  start = true;
+  restartOnUpgrade = true;
+};
+```
+
+`enable`, `start` and `restartOnUpgrade` default to `false`. `enable` requests
+boot activation and `start` requests immediate activation on the first install.
+Neither is repeated on upgrades, preserving administrator choices. An upgrade
+with `restartOnUpgrade = true` only restarts a unit that is already running.
+`stopOnRemove` defaults to `true` when any of these flags is true, otherwise
+`false`; it can be overridden. Before actual removal, units are stopped when
+requested and units with `enable = true` are disabled. Upgrades never run these
+removal actions. Users and service data are preserved.
+
+Runtime actions are skipped when systemd is not running; enable/disable may
+still update boot configuration in an offline root. Lifecycle command failures
+are visible but do not abort package installation or removal. APT uses
+`deb-systemd-helper` for boot configuration and `deb-systemd-invoke` for runtime
+requests, adding `init-system-helpers` to dependencies. Its runtime requests
+respect Debian's [policy-rc.d](https://manpages.debian.org/unstable/init-system-helpers/deb-systemd-invoke.1p.en.html)
+and disabled/masked services. APT purge also cleans the helper's bookkeeping.
+DNF and Pacman use systemctl. Masked units are never unmasked by the library.
 See [systemd-tmpfiles](https://www.freedesktop.org/software/systemd/man/systemd-tmpfiles.html).
 
-Raw `hooks.postInstall` and `hooks.postRemove` remain available for custom shell
+Raw `hooks.postInstall`, `hooks.preRemove` and `hooks.postRemove` are available for custom shell
 actions and run after the inferred actions. The declarative options describe
 what the package installs; hooks describe actions on the target system.
 The library centralizes action selection, dependencies and hook composition in
-`lib/hooks.nix`; `lib/package-integrations.nix` handles file layout and installation.
+`lib/hooks.nix`; `lib/systemd-units.nix` handles unit policies and lifecycle
+scripts, and `lib/package-integrations.nix` handles file layout and installation.
 
 ## Installation hooks
 
 The generic package interface is `mkPackage { format; ...; }`. It dispatches to
-APT, DNF or Pacman and accepts `hooks.postInstall` and `hooks.postRemove`, both
+APT, DNF or Pacman and accepts `hooks.postInstall`, `hooks.preRemove` and `hooks.postRemove`, all
 shell script strings running on the target system. For example, add these options
 to `mkPublication`:
 
@@ -160,9 +189,14 @@ hooks.postInstall = "echo 'Certificates installed'";
 trust on installation, upgrades and removal using `update-ca-certificates` for
 APT and `update-ca-trust extract` for DNF/Pacman. Put certificates in the target
 format's trust input directory; the helper does not move them. Custom hooks run
-after the refresh. APT hooks run only for configure and remove/purge events;
-RPM uses `%post`/`%postun`; Pacman uses `post_install`, `post_upgrade` and
-`post_remove`. Hooks should be idempotent; each package manager controls failure
+after the refresh. `postInstall` runs on installation and upgrades; `preRemove`
+runs before files are removed, and `postRemove` afterwards. Removal hooks skip
+upgrades and failed/aborted APT operations. APT `postRemove` also runs on purge.
+Native wrappers set `METAREPO_ACTION` to `install`, `upgrade`, `remove` or `purge`
+so custom hooks can distinguish events without interpreting manager arguments.
+APT uses `postinst`/`prerm`/`postrm`, RPM `%post`/`%preun`/`%postun`, and Pacman
+`post_install`/`post_upgrade`/`pre_remove`/`post_remove`.
+Hooks should be idempotent; each package manager controls failure
 handling. No hooks run while building the Nix derivation.
 
 ## Snapshots by commit

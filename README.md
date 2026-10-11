@@ -8,7 +8,6 @@ flake, or `lib.forPkgs` for `mkPublication` and `mkPackage`. See
 [the library API and template guide](doc/library.md). Platforms live in `packages/` and distribution aliases in `repository.nix`; adding packages or releases requires no changes elsewhere.
 
 The [generated API reference](public/doc/api.md) documents each library function.
-See [the maintainability review](doc/review.md) for changes and recommendations.
 
 The examples include C, Python, `fastfetch` and `fastfetch-git`. Fastfetch
 snapshots pin commits and hashes, with build options and dependencies per version.

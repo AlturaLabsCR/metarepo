@@ -43,11 +43,21 @@
   `systemd`
   : Optional `units`, `sysusers` and `tmpfiles` file maps; defaults to `{ }`.
     Sysusers and tmpfiles basenames must end in `.conf`. Installation creates
-    users, applies tmpfiles and reloads units as needed. Services are not started.
+    users, applies tmpfiles and reloads units as needed. Unit values may also be
+    records with `source` and boolean `enable`, `start`, `restartOnUpgrade` and
+    `stopOnRemove` options. The first three default to false. `stopOnRemove`
+    defaults to true when any of them is true, otherwise false. Enable/start
+    requests run only on installation; upgrades restart only active units.
+    Removal stops managed units before deleting files and disables units enabled
+    by the package. APT honors policy-rc.d and adds init-system-helpers.
+    Users and service data are preserved. See the library guide for examples.
 
   `hooks`
-  : Optional shell strings `postInstall` and `postRemove`; defaults to `{ }`.
-    Custom actions run after inferred actions and should be idempotent.
+  : Optional shell strings `postInstall`, `preRemove` and `postRemove`; defaults
+    to `{ }`. Custom actions run after inferred actions and should be idempotent.
+    `postInstall` runs on installation and upgrades; removal hooks run only on
+    actual removal (APT also invokes `postRemove` on purge). `METAREPO_ACTION`
+    identifies the event as install, upgrade, remove or purge.
 
   `refreshCertificates`
   : Also refresh trust for certificates in a custom payload; defaults to `false`.
