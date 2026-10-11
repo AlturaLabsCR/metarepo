@@ -9,7 +9,7 @@
 <body>
   <nav aria-label="Documentation">
     <a href="index.html">API</a> · <a href="library.html">Library guide</a> ·
-    <a href="install.html">Installation</a> · <a href="review.html">Review</a>
+    <a href="install.html">Installation</a>
   </nav>
   <nav aria-label="Contents"><ul>
 <li><a href="#use-metarepo-as-a-library"
@@ -34,8 +34,7 @@ template</a></li>
   <main><h1 id="use-metarepo-as-a-library">Use Metarepo as a
 library</h1>
 <p>See the <a href="index.html">generated function reference</a> for
-types, arguments and examples, and the <a
-href="review.html">maintainability review</a> for recommendations.</p>
+types, arguments and examples.</p>
 <p>Add Metarepo as a flake input. Your project owns
 <code>packages/</code> and the repository identity and channel/release
 configuration in <code>repository.nix</code>; you do not need to copy or
@@ -162,23 +161,54 @@ reloads the systemd manager. Only the package’s configuration basenames
 are passed to sysusers/tmpfiles, allowing administrator overrides in
 <code>/etc</code> to take precedence. Removal reloads the manager after
 units disappear; users and service data remain. Reload is skipped when
-systemd is not running (for example in an offline root). The library
-does not enable, start, restart or stop services automatically. See <a
+systemd is not running (for example in an offline root). Plain unit
+source files only install the unit. To request lifecycle actions, use a
+record for that unit:</p>
+<pre class="nix"><code>systemd.units.&quot;example.service&quot; = {
+  source = ./example.service;
+  enable = true;
+  start = true;
+  restartOnUpgrade = true;
+};</code></pre>
+<p><code>enable</code>, <code>start</code> and
+<code>restartOnUpgrade</code> default to <code>false</code>.
+<code>enable</code> requests boot activation and <code>start</code>
+requests immediate activation on the first install. Neither is repeated
+on upgrades, preserving administrator choices. An upgrade with
+<code>restartOnUpgrade = true</code> only restarts a unit that is
+already running. <code>stopOnRemove</code> defaults to <code>true</code>
+when any of these flags is true, otherwise <code>false</code>; it can be
+overridden. Before actual removal, units are stopped when requested and
+units with <code>enable = true</code> are disabled. Upgrades never run
+these removal actions. Users and service data are preserved.</p>
+<p>Runtime actions are skipped when systemd is not running;
+enable/disable may still update boot configuration in an offline root.
+Lifecycle command failures are visible but do not abort package
+installation or removal. APT uses <code>deb-systemd-helper</code> for
+boot configuration and <code>deb-systemd-invoke</code> for runtime
+requests, adding <code>init-system-helpers</code> to dependencies. Its
+runtime requests respect Debian’s <a
+href="https://manpages.debian.org/unstable/init-system-helpers/deb-systemd-invoke.1p.en.html">policy-rc.d</a>
+and disabled/masked services. APT purge also cleans the helper’s
+bookkeeping. DNF and Pacman use systemctl. Masked units are never
+unmasked by the library. See <a
 href="https://www.freedesktop.org/software/systemd/man/systemd-tmpfiles.html">systemd-tmpfiles</a>.</p>
-<p>Raw <code>hooks.postInstall</code> and <code>hooks.postRemove</code>
-remain available for custom shell actions and run after the inferred
-actions. The declarative options describe what the package installs;
-hooks describe actions on the target system. The library centralizes
-action selection, dependencies and hook composition in
-<code>lib/hooks.nix</code>; <code>lib/package-integrations.nix</code>
-handles file layout and installation.</p>
+<p>Raw <code>hooks.postInstall</code>, <code>hooks.preRemove</code> and
+<code>hooks.postRemove</code> are available for custom shell actions and
+run after the inferred actions. The declarative options describe what
+the package installs; hooks describe actions on the target system. The
+library centralizes action selection, dependencies and hook composition
+in <code>lib/hooks.nix</code>; <code>lib/systemd-units.nix</code>
+handles unit policies and lifecycle scripts, and
+<code>lib/package-integrations.nix</code> handles file layout and
+installation.</p>
 <h2 id="installation-hooks">Installation hooks</h2>
 <p>The generic package interface is
 <code>mkPackage { format; ...; }</code>. It dispatches to APT, DNF or
-Pacman and accepts <code>hooks.postInstall</code> and
-<code>hooks.postRemove</code>, both shell script strings running on the
-target system. For example, add these options to
-<code>mkPublication</code>:</p>
+Pacman and accepts <code>hooks.postInstall</code>,
+<code>hooks.preRemove</code> and <code>hooks.postRemove</code>, all
+shell script strings running on the target system. For example, add
+these options to <code>mkPublication</code>:</p>
 <pre class="nix"><code>refreshCertificates = true;
 hooks.postInstall = &quot;echo &#39;Certificates installed&#39;&quot;;</code></pre>
 <p><code>refreshCertificates</code> adds the certificate tooling to
@@ -186,13 +216,19 @@ dependencies and refreshes trust on installation, upgrades and removal
 using <code>update-ca-certificates</code> for APT and
 <code>update-ca-trust extract</code> for DNF/Pacman. Put certificates in
 the target format’s trust input directory; the helper does not move
-them. Custom hooks run after the refresh. APT hooks run only for
-configure and remove/purge events; RPM uses
-<code>%post</code>/<code>%postun</code>; Pacman uses
-<code>post_install</code>, <code>post_upgrade</code> and
-<code>post_remove</code>. Hooks should be idempotent; each package
-manager controls failure handling. No hooks run while building the Nix
-derivation.</p>
+them. Custom hooks run after the refresh. <code>postInstall</code> runs
+on installation and upgrades; <code>preRemove</code> runs before files
+are removed, and <code>postRemove</code> afterwards. Removal hooks skip
+upgrades and failed/aborted APT operations. APT <code>postRemove</code>
+also runs on purge. Native wrappers set <code>METAREPO_ACTION</code> to
+<code>install</code>, <code>upgrade</code>, <code>remove</code> or
+<code>purge</code> so custom hooks can distinguish events without
+interpreting manager arguments. APT uses
+<code>postinst</code>/<code>prerm</code>/<code>postrm</code>, RPM
+<code>%post</code>/<code>%preun</code>/<code>%postun</code>, and Pacman
+<code>post_install</code>/<code>post_upgrade</code>/<code>pre_remove</code>/<code>post_remove</code>.
+Hooks should be idempotent; each package manager controls failure
+handling. No hooks run while building the Nix derivation.</p>
 <h2 id="snapshots-by-commit">Snapshots by commit</h2>
 <p><code>mkSnapshots { snapshots; default; source; build; }</code>
 creates the default Nix package with all versions available under

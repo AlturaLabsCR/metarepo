@@ -54,6 +54,7 @@ in
 assert empty.payload == pkgs.emptyDirectory;
 assert empty.depends == [ ];
 assert empty.hooks.postInstall == "";
+assert empty.hooks.preRemove == "";
 assert empty.hooks.postRemove == "";
 assert
   cases.apt.depends == [
@@ -69,6 +70,27 @@ assert !(invalid { certificates."../bad.crt" = pkgs.emptyDirectory; }).success;
 assert !(invalid { certificates."bad.pem" = pkgs.emptyDirectory; }).success;
 assert !(invalid { systemd.typo = { }; }).success;
 assert !(invalid { systemd.tmpfiles."bad.txt" = pkgs.emptyDirectory; }).success;
+assert !(invalid { systemd.units."bad.service" = { }; }).success;
+assert
+  !(invalid {
+    systemd.units."bad.service" = {
+      source = pkgs.emptyDirectory;
+      start = "true";
+    };
+  }).success;
+assert
+  !(invalid {
+    systemd.units."bad.service" = {
+      source = pkgs.emptyDirectory;
+      typo = true;
+    };
+  }).success;
+assert
+  !(invalid {
+    systemd.units."bad.service" = {
+      source = false;
+    };
+  }).success;
 pkgs.runCommand "integration-tests" { } ''
   mkdir bin
   for tool in update-ca-certificates update-ca-trust systemctl systemd-sysusers systemd-tmpfiles; do

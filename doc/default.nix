@@ -74,11 +74,10 @@ runCommand "metarepo-doc"
     cp ${./style.css} "$out/style.css"
     for page in api library install; do
       target=$page
-      language=en
       if [ "$page" = api ]; then target=index; fi
       pandoc "$out/$page.md" --from markdown --to html5 --standalone --toc --toc-depth=2 \
         --no-highlight --template ${./template.html} \
-        --metadata title="Metarepo: $page" --metadata lang="$language" \
+        --metadata title="Metarepo: $page" --metadata lang=en \
         --output "$out/$target.html"
     done
   ''

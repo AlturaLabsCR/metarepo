@@ -31,7 +31,8 @@ metarepo = inputs.metarepo.lib.forPkgs pkgs;
 Internal composer for package installation and removal actions.
 Enable actions from declared files, infer dependencies and append custom hooks.
 Sysusers runs before tmpfiles, unit reloads and certificate trust refresh.
-No action enables or starts services or deletes users or service data.
+Unit lifecycle options explicitly request enable/start/restart/stop actions.
+Users and service data are preserved.
 
 ### Type
 
@@ -48,8 +49,9 @@ hooks :: AttrSet -> { depends :: [String], hooks :: AttrSet }
 : Integration declarations from `mkPackage`; these inputs are required here.
 
 `hooks`
-: Optional `postInstall` and `postRemove` shell strings; defaults to `{ }`.
-  Other hook names are rejected.
+: Optional `postInstall`, `preRemove` and `postRemove` shell strings; defaults
+  to `{ }`. Native builders set `METAREPO_ACTION` to install, upgrade, remove
+  or purge. Other hook names are rejected.
 
 ### Examples
 
@@ -120,7 +122,10 @@ packageIntegrations :: AttrSet -> { payload :: Derivation, depends :: [String], 
 : Required integration inputs as documented in `mkPackage`.
 
 `hooks`
-: Optional custom installation/removal scripts; defaults to `{ }`.
+: Optional `postInstall`, `preRemove` and `postRemove` scripts; defaults to `{ }`.
+
+Unit entries accept source files or records with explicit lifecycle options;
+`systemd-units.nix` validates them and supplies their source file map.
 
 Return `payload`, `depends` and `hooks` for the native format builder.
 
@@ -134,6 +139,51 @@ integration = pkgs.callPackage ./lib/package-integrations.nix { } {
   certificates."example.crt" = ./example.crt;
   systemd = { };
   refreshCertificates = false;
+};
+```
+
+## `metarepo.internal.systemdUnits`
+
+Internal normalizer and lifecycle action builder for systemd units.
+Accept source files or records with a source and explicit lifecycle options.
+Return the file map and an action record consumed by the hook composer.
+Preserve users and service data on removal.
+
+### Type
+
+```
+systemdUnits :: AttrSet -> AttrSet
+```
+
+### Inputs
+
+`format`
+: Package format: `apt`, `dnf` or `pacman`. APT uses Debian's service helpers
+  to respect policy-rc.d; other formats use systemctl.
+
+`units`
+: Unit basenames mapped to source paths, file derivations, or records with
+  `source`, `enable`, `start`, `restartOnUpgrade` and `stopOnRemove`.
+  The first three lifecycle flags default to false. `stopOnRemove` defaults
+  to true when any of them is true, otherwise false.
+
+Hooks receive `METAREPO_ACTION` from the native builder. Enable/start requests
+occur only on installation; upgrades only try to restart active units.
+Before removal, managed units are stopped and those enabled by the package
+are disabled. Runtime requests are skipped without a running systemd manager.
+Lifecycle command failures are reported by the tools but do not fail packaging.
+
+### Examples
+
+```nix
+actions = import ./lib/systemd-units.nix { inherit lib; } {
+  format = "apt";
+  units."example.service" = {
+    source = ./example.service;
+    enable = true;
+    start = true;
+    restartOnUpgrade = true;
+  };
 };
 ```
 
@@ -269,11 +319,21 @@ mkPackage :: AttrSet -> Derivation
 `systemd`
 : Optional `units`, `sysusers` and `tmpfiles` file maps; defaults to `{ }`.
   Sysusers and tmpfiles basenames must end in `.conf`. Installation creates
-  users, applies tmpfiles and reloads units as needed. Services are not started.
+  users, applies tmpfiles and reloads units as needed. Unit values may also be
+  records with `source` and boolean `enable`, `start`, `restartOnUpgrade` and
+  `stopOnRemove` options. The first three default to false. `stopOnRemove`
+  defaults to true when any of them is true, otherwise false. Enable/start
+  requests run only on installation; upgrades restart only active units.
+  Removal stops managed units before deleting files and disables units enabled
+  by the package. APT honors policy-rc.d and adds init-system-helpers.
+  Users and service data are preserved. See the library guide for examples.
 
 `hooks`
-: Optional shell strings `postInstall` and `postRemove`; defaults to `{ }`.
-  Custom actions run after inferred actions and should be idempotent.
+: Optional shell strings `postInstall`, `preRemove` and `postRemove`; defaults
+  to `{ }`. Custom actions run after inferred actions and should be idempotent.
+  `postInstall` runs on installation and upgrades; removal hooks run only on
+  actual removal (APT also invokes `postRemove` on purge). `METAREPO_ACTION`
+  identifies the event as install, upgrade, remove or purge.
 
 `refreshCertificates`
 : Also refresh trust for certificates in a custom payload; defaults to `false`.

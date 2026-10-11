@@ -181,6 +181,7 @@ assert
   integrations = import ./integrations.nix { inherit pkgs; };
   fastfetch = import ./fastfetch.nix { inherit pkgs api; };
   native-packages = import ./native-packages.nix { inherit pkgs api; };
+  services = import ./services.nix { inherit pkgs api; };
   installer = pkgs.runCommand "installer-tests" { } ''
         sh -n ${public.installScript}
         # Source only the definitions; never run package managers or alter /etc.
