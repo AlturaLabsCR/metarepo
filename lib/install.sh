@@ -45,6 +45,19 @@ _install_apt() {
 }
 
 _install_dnf() {
+  if command -v zypper >/dev/null 2>&1; then
+    _install_zypper "$1" "$2"
+  else
+    _install_rpm "$1" "$2" /etc/yum.repos.d
+  fi
+}
+
+_install_zypper() {
+  _install_rpm "$1" "$2" /etc/zypp/repos.d
+  zypper --non-interactive refresh "$REPO_ID-$1"
+}
+
+_install_rpm() {
   repository="$1"
   architecture="$(uname -m)"
   _check_architecture "$2" "$architecture"
@@ -55,13 +68,15 @@ _install_dnf() {
   install -D -m 0644 "$tmp" "/etc/pki/rpm-gpg/$REPO_KEY"
   rpm --import "/etc/pki/rpm-gpg/$REPO_KEY"
 
-  install -d -m 0755 /etc/yum.repos.d
-  cat > "/etc/yum.repos.d/$REPO_ID-$repository.repo" <<INI
+  install -d -m 0755 "$3"
+  cat > "$3/$REPO_ID-$repository.repo" <<INI
 [$REPO_ID-$repository]
 name=$REPO_LABEL ($repository)
 baseurl=$REPO_ROOT/$repository/
 enabled=1
+autorefresh=1
 gpgcheck=1
+pkg_gpgcheck=1
 # Disable metadata signature checks to avoid the related warning.
 repo_gpgcheck=0
 gpgkey=file:///etc/pki/rpm-gpg/$REPO_KEY
@@ -114,6 +129,11 @@ _get_release() {
       break
     fi
   done
+
+  # Tumbleweed VERSION_ID is a snapshot date, not a distribution release.
+  case "${ID:-}" in
+    opensuse-tumbleweed) VERSION_ID= ;;
+  esac
 
   release_id="$(printf '%s' "${ID:-}${VERSION_ID:-}" | tr -d '.')"
   case " $SUPPORTED " in

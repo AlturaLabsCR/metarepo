@@ -256,6 +256,10 @@ architectures must match `[a-zA-Z0-9][a-zA-Z0-9_+-]*`.
 A channel is a shared repository: an alias selects all packages published in
 that channel. Use separate channels for incompatible distribution builds.
 
+RPM channels use `format = "dnf"`. The shell installer automatically uses
+Zypper and `/etc/zypp/repos.d` when `zypper` is available, reusing RPM artifacts
+and metadata.
+
 The installer configures the selected channel and checks its architectures.
 APT metadata also uses each suite's own architectures. There are no distribution
 version defaults in the library. Associations declare compatibility; they do

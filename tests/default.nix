@@ -33,6 +33,13 @@ let
         format = "dnf";
         releases = [ "example43" ];
       };
+      suse = {
+        format = "dnf";
+        releases = [
+          "opensuse-leap160"
+          "opensuse-tumbleweed"
+        ];
+      };
       rolling = {
         format = "pacman";
         releases = [ "custom" ];
@@ -48,6 +55,10 @@ let
         };
         next = {
           architecture = "aarch64";
+          package = pkgs.emptyDirectory;
+        };
+        suse = {
+          architecture = "noarch";
           package = pkgs.emptyDirectory;
         };
         rolling = {
@@ -74,6 +85,7 @@ let
       channels = {
         stable = artifact "apt" "all";
         next = artifact "dnf" "aarch64";
+        suse = artifact "dnf" "noarch";
         rolling = artifact "pacman" "any";
       };
     }
@@ -194,6 +206,8 @@ assert
         [ "$(_install_release example42)" = apt:stable:all ]
         [ "$(_install_release another1)" = apt:stable:all ]
         [ "$(_install_release example43)" = dnf:next:aarch64 ]
+        [ "$(_install_release opensuse-leap160)" = dnf:suse:noarch ]
+        [ "$(_install_release opensuse-tumbleweed)" = dnf:suse:noarch ]
         [ "$(_install_release custom)" = pacman:rolling:any ]
         [ "$(_install_release stable)" = apt:stable:all ]
         if (_install_release unknown) 2>/dev/null; then exit 1; fi
@@ -203,6 +217,29 @@ assert
         if (_check_architecture amd64 arm64) 2>/dev/null; then exit 1; fi
     SH
         sh functions.sh
+        # Exercise detection and RPM setup against an isolated filesystem.
+        sed 's|/etc/|./etc/|g; s|/usr/lib/os-release|./usr/lib/os-release|g' functions.sh \
+          | sed '/^[[:space:]]*_install_apt() { printf/,$d' > isolated.sh
+        mkdir -p etc
+        cat >> isolated.sh <<'SH'
+        printf 'ID=opensuse-tumbleweed\nVERSION_ID=20261016\n' > etc/os-release
+        [ "$(_get_release)" = opensuse-tumbleweed ]
+        printf 'ID=opensuse-leap\nVERSION_ID=16.0\n' > etc/os-release
+        [ "$(_get_release)" = opensuse-leap160 ]
+        printf 'ID=opensuse-leap\nVERSION_ID=99.0\n' > etc/os-release
+        if (_get_release) 2>/dev/null; then exit 1; fi
+        curl() { printf key > "$2"; }
+        rpm() { [ "$1" = --import ] && [ -f "$2" ]; }
+        zypper() { printf '%s\n' "$*" > zypper.log; }
+        _install_release opensuse-tumbleweed
+        grep -Fx 'baseurl=https://example.invalid/packages/suse/' etc/zypp/repos.d/test-suse.repo
+        grep -Fx 'pkg_gpgcheck=1' etc/zypp/repos.d/test-suse.repo
+        grep -Fx -- '--non-interactive refresh test-suse' zypper.log
+        unset -f zypper
+        _install_dnf next noarch
+        test -f etc/yum.repos.d/test-next.repo
+    SH
+        sh isolated.sh
         touch "$out"
   '';
 }

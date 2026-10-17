@@ -20,6 +20,9 @@ installation</a>
 (<code>apt</code>)</a></li>
 <li><a href="#fedora-dnf" id="toc-fedora-dnf">Fedora
 (<code>dnf</code>)</a></li>
+<li><a href="#opensuse-leap-16.0-and-tumbleweed-zypper"
+id="toc-opensuse-leap-16.0-and-tumbleweed-zypper">openSUSE Leap 16.0 and
+Tumbleweed (<code>zypper</code>)</a></li>
 <li><a href="#arch-linux-pacman" id="toc-arch-linux-pacman">Arch Linux
 (<code>pacman</code>)</a></li>
 <li><a href="#nix" id="toc-nix">Nix</a></li>
@@ -57,6 +60,28 @@ repo_gpgcheck=0
 gpgkey=https://packages.example.org/metarepo/metarepo.asc</code></pre>
 <p>Then install the packages:</p>
 <pre class="sh"><code>sudo dnf install metarepo-hello-c metarepo-hello-python</code></pre>
+<h2 id="opensuse-leap-16.0-and-tumbleweed-zypper">openSUSE Leap 16.0 and
+Tumbleweed (<code>zypper</code>)</h2>
+<p>Both releases use the <code>suse</code> RPM channel:</p>
+<pre class="sh"><code>BASE_URL=&quot;https://packages.example.org/metarepo&quot;
+sudo rpm --import &quot;$BASE_URL/metarepo.asc&quot;
+sudo tee /etc/zypp/repos.d/metarepo-suse.repo &gt;/dev/null &lt;&lt;EOF
+[metarepo-suse]
+name=Metarepo (openSUSE)
+baseurl=$BASE_URL/suse/
+enabled=1
+autorefresh=1
+gpgcheck=1
+pkg_gpgcheck=1
+repo_gpgcheck=0
+gpgkey=$BASE_URL/metarepo.asc
+EOF
+sudo zypper refresh metarepo-suse
+sudo zypper install metarepo-hello-c metarepo-hello-python</code></pre>
+<p>Package signatures are required; metadata signature checks are
+disabled, as in Fedora’s configuration. See the <a
+href="https://manpages.opensuse.org/Tumbleweed/zypper/zypper.8.en.html">Zypper
+documentation</a>.</p>
 <h2 id="arch-linux-pacman">Arch Linux (<code>pacman</code>)</h2>
 <p>Download and verify the key fingerprint before trusting it:</p>
 <pre class="sh"><code>tmp=&quot;$(mktemp)&quot;

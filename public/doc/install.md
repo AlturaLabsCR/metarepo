@@ -42,6 +42,31 @@ Then install the packages:
 sudo dnf install metarepo-hello-c metarepo-hello-python
 ```
 
+## openSUSE Leap 16.0 and Tumbleweed (`zypper`)
+
+Both releases use the `suse` RPM channel:
+
+```sh
+BASE_URL="https://packages.example.org/metarepo"
+sudo rpm --import "$BASE_URL/metarepo.asc"
+sudo tee /etc/zypp/repos.d/metarepo-suse.repo >/dev/null <<EOF
+[metarepo-suse]
+name=Metarepo (openSUSE)
+baseurl=$BASE_URL/suse/
+enabled=1
+autorefresh=1
+gpgcheck=1
+pkg_gpgcheck=1
+repo_gpgcheck=0
+gpgkey=$BASE_URL/metarepo.asc
+EOF
+sudo zypper refresh metarepo-suse
+sudo zypper install metarepo-hello-c metarepo-hello-python
+```
+
+Package signatures are required; metadata signature checks are disabled, as in
+Fedora's configuration. See the [Zypper documentation](https://manpages.opensuse.org/Tumbleweed/zypper/zypper.8.en.html).
+
 ## Arch Linux (`pacman`)
 
 Download and verify the key fingerprint before trusting it:

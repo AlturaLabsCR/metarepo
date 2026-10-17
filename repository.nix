@@ -21,6 +21,13 @@
       format = "dnf";
       releases = [ "fedora44" ];
     };
+    suse = {
+      format = "dnf";
+      releases = [
+        "opensuse-leap160"
+        "opensuse-tumbleweed"
+      ];
+    };
     arch = {
       format = "pacman";
       releases = [ "arch" ];
