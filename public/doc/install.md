@@ -49,8 +49,8 @@ Both releases use the `suse` RPM channel:
 ```sh
 BASE_URL="https://packages.example.org/metarepo"
 sudo rpm --import "$BASE_URL/metarepo.asc"
-sudo tee /etc/zypp/repos.d/metarepo-suse.repo >/dev/null <<EOF
-[metarepo-suse]
+sudo tee /etc/zypp/repos.d/metarepo.repo >/dev/null <<EOF
+[metarepo]
 name=Metarepo (openSUSE)
 baseurl=$BASE_URL/suse/
 enabled=1
@@ -60,7 +60,7 @@ pkg_gpgcheck=1
 repo_gpgcheck=0
 gpgkey=$BASE_URL/metarepo.asc
 EOF
-sudo zypper refresh metarepo-suse
+sudo zypper refresh metarepo
 sudo zypper install metarepo-hello-c metarepo-hello-python
 ```
 

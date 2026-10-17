@@ -232,9 +232,10 @@ assert
         rpm() { [ "$1" = --import ] && [ -f "$2" ]; }
         zypper() { printf '%s\n' "$*" > zypper.log; }
         _install_release opensuse-tumbleweed
-        grep -Fx 'baseurl=https://example.invalid/packages/suse/' etc/zypp/repos.d/test-suse.repo
-        grep -Fx 'pkg_gpgcheck=1' etc/zypp/repos.d/test-suse.repo
-        grep -Fx -- '--non-interactive refresh test-suse' zypper.log
+        grep -Fx 'baseurl=https://example.invalid/packages/suse/' etc/zypp/repos.d/test.repo
+        grep -Fx '[test]' etc/zypp/repos.d/test.repo
+        grep -Fx 'pkg_gpgcheck=1' etc/zypp/repos.d/test.repo
+        grep -Fx -- '--non-interactive refresh test' zypper.log
         unset -f zypper
         _install_dnf next noarch
         test -f etc/yum.repos.d/test-next.repo

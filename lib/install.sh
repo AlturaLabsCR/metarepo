@@ -53,12 +53,13 @@ _install_dnf() {
 }
 
 _install_zypper() {
-  _install_rpm "$1" "$2" /etc/zypp/repos.d
-  zypper --non-interactive refresh "$REPO_ID-$1"
+  _install_rpm "$1" "$2" /etc/zypp/repos.d "$REPO_ID"
+  zypper --non-interactive refresh "$REPO_ID"
 }
 
 _install_rpm() {
   repository="$1"
+  rpm_repo_id="${4:-$REPO_ID-$repository}"
   architecture="$(uname -m)"
   _check_architecture "$2" "$architecture"
 
@@ -69,8 +70,8 @@ _install_rpm() {
   rpm --import "/etc/pki/rpm-gpg/$REPO_KEY"
 
   install -d -m 0755 "$3"
-  cat > "$3/$REPO_ID-$repository.repo" <<INI
-[$REPO_ID-$repository]
+  cat > "$3/$rpm_repo_id.repo" <<INI
+[$rpm_repo_id]
 name=$REPO_LABEL ($repository)
 baseurl=$REPO_ROOT/$repository/
 enabled=1

@@ -65,8 +65,8 @@ Tumbleweed (<code>zypper</code>)</h2>
 <p>Both releases use the <code>suse</code> RPM channel:</p>
 <pre class="sh"><code>BASE_URL=&quot;https://packages.example.org/metarepo&quot;
 sudo rpm --import &quot;$BASE_URL/metarepo.asc&quot;
-sudo tee /etc/zypp/repos.d/metarepo-suse.repo &gt;/dev/null &lt;&lt;EOF
-[metarepo-suse]
+sudo tee /etc/zypp/repos.d/metarepo.repo &gt;/dev/null &lt;&lt;EOF
+[metarepo]
 name=Metarepo (openSUSE)
 baseurl=$BASE_URL/suse/
 enabled=1
@@ -76,7 +76,7 @@ pkg_gpgcheck=1
 repo_gpgcheck=0
 gpgkey=$BASE_URL/metarepo.asc
 EOF
-sudo zypper refresh metarepo-suse
+sudo zypper refresh metarepo
 sudo zypper install metarepo-hello-c metarepo-hello-python</code></pre>
 <p>Package signatures are required; metadata signature checks are
 disabled, as in Fedora’s configuration. See the <a
