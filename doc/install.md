@@ -112,3 +112,41 @@ Or run a package without adding it to the profile:
 nix run github:AlturaLabsCR/metarepo#hello
 nix run github:AlturaLabsCR/metarepo#hello-python
 ```
+
+## Windows MSI
+
+For repositories publishing an MSI channel, download their generated script:
+
+```powershell
+Invoke-WebRequest -Uri 'https://packages.example.org/metarepo/install.ps1' -OutFile install.ps1
+.\install.ps1 -Package example
+.\install.ps1 -Package example -Version 1.0.0 -Architecture x64 -Silent
+.\install.ps1 -Package example -Scope User
+```
+
+Requires Windows PowerShell 5.1 or PowerShell 7 on Windows. Local execution policy
+must allow the downloaded script; it does not change execution policies.
+The default release alias `windows11` checks for a workstation with build 22000
+or newer. `-Release` can select another configured Windows alias or channel.
+Architecture detection uses the native OS architecture, including when PowerShell
+runs as a 32-bit process. `-Architecture` overrides it explicitly.
+
+The script downloads the catalog over HTTPS, selects the matching MSI, verifies
+SHA-256, and invokes `msiexec`. With multiple versions it requires `-Version`;
+with multiple package revisions it also requires `-PackageRelease`. It does not
+silently select a version by filename order.
+
+The default `-Scope Machine` requests installation for all users and prompts for
+administrator elevation when needed. `-Scope User` requests per-user installation
+with `ALLUSERS=2 MSIINSTALLPERUSER=1` and does not explicitly elevate. This only
+works when the MSI supports per-user installation; the script cannot make a
+machine-only MSI install without the permissions it needs. See Microsoft's
+[MSIINSTALLPERUSER documentation](https://learn.microsoft.com/en-us/windows/win32/msi/msiinstallperuser).
+
+`-Silent` passes `/qn` to MSI; elevation may still display a UAC prompt.
+`-WhatIf` resolves the catalog entry without downloading or executing the MSI.
+All installations pass `/norestart`. The script reports installer failures and
+restart-required results, preserves the installation log in the temporary
+folder, and removes the downloaded MSI. It does not automatically uninstall
+other products, configure WinGet, or schedule future updates. Upgrade and
+uninstall behavior are defined by the MSI itself.

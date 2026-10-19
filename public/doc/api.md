@@ -23,7 +23,7 @@ forPkgs :: AttrSet -> AttrSet
 ```nix
 metarepo = inputs.metarepo.lib.forPkgs pkgs;
 # metarepo.mkPackage, mkPublication, mkPayload, mkSnapshots,
-# mkPublic, mkApt, mkDnf and mkPacman are now available.
+# mkPublic, mkApt, mkDnf, mkPacman and mkMsi are now available.
 ```
 
 ## `metarepo.internal.hooks`
@@ -273,9 +273,24 @@ metarepo.mkDnf {
 # Produces "$out/example-1.0-1.noarch.rpm".
 ```
 
+## `metarepo.mkMsi`
+
+Publish an existing Windows MSI without rebuilding or modifying its bytes.
+Building the installer (for example with WiX on Windows) is the caller's job.
+
+### Inputs
+
+`installer`: Path to an already built MSI, typically from `fetchurl` with a hash.
+`name`, `version`: Catalog identifiers and filename components.
+`architecture`: Windows target architecture: `x86`, `x64` or `arm64`.
+Standard descriptive metadata is accepted for consistency with `mkPackage`.
+
+Return a directory containing the MSI and its JSON metadata with SHA-256,
+plus `passthru.metarepo = { format = "msi"; architecture; }`.
+
 ## `metarepo.mkPackage`
 
-Build an APT, DNF or Pacman artifact from a native filesystem payload.
+Build an APT, DNF or Pacman artifact, or publish an existing Windows MSI.
 Declarative certificate and systemd files extend the payload, dependencies
 and hooks before dispatching to the format builder. Hooks run on the target
 machine, never during the Nix build.
@@ -292,7 +307,9 @@ mkPackage :: AttrSet -> Derivation
 ### Inputs
 
 `format`
-: One of `"apt"`, `"dnf"` or `"pacman"`.
+: One of `"apt"`, `"dnf"`, `"pacman"` or `"msi"`. MSI requires `installer`
+  (a prebuilt file) and architecture `x86`, `x64` or `arm64`. Linux payloads,
+  integrations, hooks and dependency options are rejected for MSI.
 
 `name`, `version`, `architecture`
 : Native package name, upstream version and format-specific architecture.
@@ -498,7 +515,7 @@ mkPublic :: AttrSet -> Derivation
 
 `repository`
 : Attribute set with `id`, `origin`, `label`, `url` and `channels`.
-  Each channel specifies `format` (`apt`, `dnf` or `pacman`) and optional
+  Each channel specifies `format` (`apt`, `dnf`, `pacman` or `msi`) and optional
   `releases` (installer aliases, default `[ ]`). The installer also accepts
   channel names. IDs, published channels, release aliases and architectures
   must match `[a-zA-Z0-9][a-zA-Z0-9_+-]*`.
@@ -509,7 +526,11 @@ mkPublic :: AttrSet -> Derivation
 
 APT suites share `apt/pool` with indexes under `apt/dists/<suite>`.
 Identical artifacts are stored once by SHA-256; `apt` is a reserved channel
-name. Existing APT clients must rerun the installer to use the `/apt` URL.
+name. MSI channels contain unchanged installers, JSON metadata and a catalog
+with SHA-256 hashes. `installPowerShell` exposes the generated `install.ps1`,
+which is published when MSI channels are active. MSI files are not signed by
+`GPG_KEY_ID`; preserve any Authenticode signatures in the original installer.
+Existing APT clients must rerun the installer to use the `/apt` URL.
 
 ### Examples
 
@@ -563,13 +584,18 @@ mkPublication :: AttrSet -> AttrSet
 
 `channels`
 : Channel names to subscribe to; defaults to all configured channels.
-  Unknown names are rejected.
+  Unknown names are rejected. In mixed repositories, select channels explicitly
+  so Linux payloads are not published to MSI channels.
 
 `independent`
 : Defaults to `false`. When true, use APT `all`, RPM `noarch` and Pacman `any`.
 
 `formats`
 : Package option overrides indexed by format; defaults to `{ }`.
+
+For MSI channels supply `formats.msi.installer` (a prebuilt MSI) and
+`formats.msi.architecture` (`x86`, `x64` or `arm64`); no Windows architecture
+is inferred from the Linux build host. The payload must remain empty.
 
 `overrides`
 : Package option overrides indexed by channel; defaults to `{ }`.

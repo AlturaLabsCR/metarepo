@@ -21,6 +21,7 @@ let
     mkApt = "mk-apt";
     mkDnf = "mk-dnf";
     mkPacman = "mk-pacman";
+    mkMsi = "mk-msi";
     internal.mkRepository = "mk-repository";
     internal.hooks = "hooks";
     internal.packageIntegrations = "package-integrations";
@@ -60,7 +61,7 @@ runCommand "metarepo-doc"
     mkdir -p "$out"
     nixdoc --manifest ${manifest} --root ${source} --output "$out/api.json"
     jq -er '
-      if (.entries | length) != 14 then error("Missing library doc-comments") else
+      if (.entries | length) != 15 then error("Missing library doc-comments") else
       ["# Metarepo library reference",
        "Generated from Nix doc-comments with nixdoc. See the [library guide](library.html) and [installation guide](install.html). Entries under metarepo.internal describe implementation helpers.",
        (.entries[] | "## `" + .attrPath + "`\n\n" +

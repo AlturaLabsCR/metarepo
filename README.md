@@ -1,7 +1,7 @@
 # Metarepo
 
 Reusable Nix library and project template for building APT, DNF and Pacman
-package repositories.
+package repositories, plus publication of prebuilt Windows MSI installers.
 
 Use `lib.mkPackages` to export packages and the repository builder from another
 flake, or `lib.forPkgs` for `mkPublication` and `mkPackage`. See

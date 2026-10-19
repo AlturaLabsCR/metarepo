@@ -29,6 +29,8 @@ id="toc-metarepo.internal.systemdunits"><code>metarepo.internal.systemdUnits</co
 id="toc-metarepo.mkapt"><code>metarepo.mkApt</code></a></li>
 <li><a href="#metarepo.mkdnf"
 id="toc-metarepo.mkdnf"><code>metarepo.mkDnf</code></a></li>
+<li><a href="#metarepo.mkmsi"
+id="toc-metarepo.mkmsi"><code>metarepo.mkMsi</code></a></li>
 <li><a href="#metarepo.mkpackage"
 id="toc-metarepo.mkpackage"><code>metarepo.mkPackage</code></a></li>
 <li><a href="#metarepo.mkpackages"
@@ -67,7 +69,7 @@ A Nixpkgs package set. Native package builders require Linux.
 <h3 id="examples">Examples</h3>
 <pre class="nix"><code>metarepo = inputs.metarepo.lib.forPkgs pkgs;
 # metarepo.mkPackage, mkPublication, mkPayload, mkSnapshots,
-# mkPublic, mkApt, mkDnf and mkPacman are now available.</code></pre>
+# mkPublic, mkApt, mkDnf, mkPacman and mkMsi are now available.</code></pre>
 <h2
 id="metarepo.internal.hooks"><code>metarepo.internal.hooks</code></h2>
 <p>Internal composer for package installation and removal actions.
@@ -310,20 +312,39 @@ filesystem content are packaged.</p>
   license = &quot;MIT&quot;;
 }
 # Produces &quot;$out/example-1.0-1.noarch.rpm&quot;.</code></pre>
+<h2 id="metarepo.mkmsi"><code>metarepo.mkMsi</code></h2>
+<p>Publish an existing Windows MSI without rebuilding or modifying its
+bytes. Building the installer (for example with WiX on Windows) is the
+caller’s job.</p>
+<h3 id="inputs-7">Inputs</h3>
+<p><code>installer</code>: Path to an already built MSI, typically from
+<code>fetchurl</code> with a hash. <code>name</code>,
+<code>version</code>: Catalog identifiers and filename components.
+<code>architecture</code>: Windows target architecture:
+<code>x86</code>, <code>x64</code> or <code>arm64</code>. Standard
+descriptive metadata is accepted for consistency with
+<code>mkPackage</code>.</p>
+<p>Return a directory containing the MSI and its JSON metadata with
+SHA-256, plus
+<code>passthru.metarepo = { format = "msi"; architecture; }</code>.</p>
 <h2 id="metarepo.mkpackage"><code>metarepo.mkPackage</code></h2>
-<p>Build an APT, DNF or Pacman artifact from a native filesystem
-payload. Declarative certificate and systemd files extend the payload,
+<p>Build an APT, DNF or Pacman artifact, or publish an existing Windows
+MSI. Declarative certificate and systemd files extend the payload,
 dependencies and hooks before dispatching to the format builder. Hooks
 run on the target machine, never during the Nix build.</p>
 <p>Return a derivation containing the native package file and
 <code>passthru.metarepo = { format; architecture; }</code>.</p>
 <h3 id="type-7">Type</h3>
 <pre><code>mkPackage :: AttrSet -&gt; Derivation</code></pre>
-<h3 id="inputs-7">Inputs</h3>
+<h3 id="inputs-8">Inputs</h3>
 <dl>
 <dt><code>format</code></dt>
 <dd>
-One of <code>"apt"</code>, <code>"dnf"</code> or <code>"pacman"</code>.
+One of <code>"apt"</code>, <code>"dnf"</code>, <code>"pacman"</code> or
+<code>"msi"</code>. MSI requires <code>installer</code> (a prebuilt
+file) and architecture <code>x86</code>, <code>x64</code> or
+<code>arm64</code>. Linux payloads, integrations, hooks and dependency
+options are rejected for MSI.
 </dd>
 <dt><code>name</code>, <code>version</code>,
 <code>architecture</code></dt>
@@ -416,7 +437,7 @@ Only packages declared for a system are evaluated on that system.</p>
 without evaluating Nixpkgs or repository configuration.</p>
 <h3 id="type-8">Type</h3>
 <pre><code>mkPackages :: AttrSet -&gt; AttrSet</code></pre>
-<h3 id="inputs-8">Inputs</h3>
+<h3 id="inputs-9">Inputs</h3>
 <dl>
 <dt><code>packagesDir</code></dt>
 <dd>
@@ -451,7 +472,7 @@ integrations. Prefer <code>mkPackage</code> to infer certificate/systemd
 dependencies and actions.</p>
 <h3 id="type-9">Type</h3>
 <pre><code>mkPacman :: AttrSet -&gt; Derivation</code></pre>
-<h3 id="inputs-9">Inputs</h3>
+<h3 id="inputs-10">Inputs</h3>
 <dl>
 <dt><code>name</code>, <code>version</code>, <code>payload</code>,
 <code>architecture</code>, <code>description</code>,
@@ -496,7 +517,7 @@ references. Use a portable build or assemble a custom payload when
 relocation is needed.</p>
 <h3 id="type-10">Type</h3>
 <pre><code>mkPayload :: AttrSet -&gt; Derivation</code></pre>
-<h3 id="inputs-10">Inputs</h3>
+<h3 id="inputs-11">Inputs</h3>
 <dl>
 <dt><code>package</code></dt>
 <dd>
@@ -529,7 +550,7 @@ or <code>.env</code>. Its <code>installScript</code> is the generated
 installer.</p>
 <h3 id="type-11">Type</h3>
 <pre><code>mkPublic :: AttrSet -&gt; Derivation</code></pre>
-<h3 id="inputs-11">Inputs</h3>
+<h3 id="inputs-12">Inputs</h3>
 <dl>
 <dt><code>publications</code></dt>
 <dd>
@@ -546,7 +567,7 @@ ultimately defaults to the configured channel format.
 Attribute set with <code>id</code>, <code>origin</code>,
 <code>label</code>, <code>url</code> and <code>channels</code>. Each
 channel specifies <code>format</code> (<code>apt</code>,
-<code>dnf</code> or <code>pacman</code>) and optional
+<code>dnf</code>, <code>pacman</code> or <code>msi</code>) and optional
 <code>releases</code> (installer aliases, default <code>[ ]</code>). The
 installer also accepts channel names. IDs, published channels, release
 aliases and architectures must match
@@ -561,9 +582,13 @@ reserved.
 </dl>
 <p>APT suites share <code>apt/pool</code> with indexes under
 <code>apt/dists/&lt;suite&gt;</code>. Identical artifacts are stored
-once by SHA-256; <code>apt</code> is a reserved channel name. Existing
-APT clients must rerun the installer to use the <code>/apt</code>
-URL.</p>
+once by SHA-256; <code>apt</code> is a reserved channel name. MSI
+channels contain unchanged installers, JSON metadata and a catalog with
+SHA-256 hashes. <code>installPowerShell</code> exposes the generated
+<code>install.ps1</code>, which is published when MSI channels are
+active. MSI files are not signed by <code>GPG_KEY_ID</code>; preserve
+any Authenticode signatures in the original installer. Existing APT
+clients must rerun the installer to use the <code>/apt</code> URL.</p>
 <h3 id="examples-11">Examples</h3>
 <pre class="nix"><code>public = metarepo.mkPublic {
   publications = [ publication ];
@@ -591,7 +616,7 @@ format.</p>
 exists, every snapshot is published.</p>
 <h3 id="type-12">Type</h3>
 <pre><code>mkPublication :: AttrSet -&gt; AttrSet</code></pre>
-<h3 id="inputs-12">Inputs</h3>
+<h3 id="inputs-13">Inputs</h3>
 <dl>
 <dt><code>repository</code></dt>
 <dd>
@@ -614,7 +639,8 @@ payload depends on a snapshot’s contents.
 <dt><code>channels</code></dt>
 <dd>
 Channel names to subscribe to; defaults to all configured channels.
-Unknown names are rejected.
+Unknown names are rejected. In mixed repositories, select channels
+explicitly so Linux payloads are not published to MSI channels.
 </dd>
 <dt><code>independent</code></dt>
 <dd>
@@ -626,6 +652,13 @@ Defaults to <code>false</code>. When true, use APT <code>all</code>, RPM
 Package option overrides indexed by format; defaults to
 <code>{ }</code>.
 </dd>
+</dl>
+<p>For MSI channels supply <code>formats.msi.installer</code> (a
+prebuilt MSI) and <code>formats.msi.architecture</code>
+(<code>x86</code>, <code>x64</code> or <code>arm64</code>); no Windows
+architecture is inferred from the Linux build host. The payload must
+remain empty.</p>
+<dl>
 <dt><code>overrides</code></dt>
 <dd>
 Package option overrides indexed by channel; defaults to
@@ -652,7 +685,7 @@ each snapshot’s native publication options under
 preserved.</p>
 <h3 id="type-13">Type</h3>
 <pre><code>mkSnapshots :: AttrSet -&gt; Derivation</code></pre>
-<h3 id="inputs-13">Inputs</h3>
+<h3 id="inputs-14">Inputs</h3>
 <dl>
 <dt><code>snapshots</code></dt>
 <dd>

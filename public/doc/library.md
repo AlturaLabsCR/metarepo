@@ -284,7 +284,7 @@ rerun the installer or update their source entry, keeping the suite unchanged
 
 For projects with a different layout, use `metarepo.lib.forPkgs pkgs`. It exposes:
 
-- `mkPackage`: takes `format` (`"apt"`, `"dnf"`, `"pacman"`), `name`,
+- `mkPackage`: takes `format` (`"apt"`, `"dnf"`, `"pacman"`, `"msi"`), `name`,
   `version`, `architecture`, `description`, `homepage`, `maintainer`,
   `license`, optional `depends`, `recommends`, `conflicts`, `provides` (lists),
   `release` (default `"1"`), optional `payload` (empty by default), `certificates`,
@@ -297,7 +297,8 @@ For projects with a different layout, use `metarepo.lib.forPkgs pkgs`. It expose
 - `mkPublic { publications; repository; }`: an unsigned repository derivation.
   Its `builder` attribute is the executable derivation that generates `public/`
   in the working directory, with optional signing through `GPG_KEY_ID`.
-  Its `installScript` attribute contains the generated installer.
+  Its `installScript` attribute contains the generated Linux installer;
+  `installPowerShell` contains the Windows installer.
 
 No directory discovery is required by these builders. Custom package derivations
 can provide `passthru.metarepo` metadata for `mkPublic`, or set `architecture`
@@ -325,3 +326,52 @@ nix run .#build-public
 
 The existing workflow publishes the resulting static `public/` directory to
 GitHub Pages. Configure its URL and signing secrets as described in the README.
+
+## Windows MSI publication
+
+MSI publication preserves an existing installer; metarepo does not compile Windows
+programs or turn Linux payloads into MSI files. Build the MSI separately and use
+a pinned source such as `pkgs.fetchurl` with `hash`.
+
+```nix
+repository.channels.win = {
+  format = "msi";
+  releases = [ "windows11" ];
+};
+
+msi = metarepo.mkPackage {
+  format = "msi";
+  name = "example";
+  version = "1.0.0";
+  architecture = "x64"; # x86, x64 or arm64; target, not build host
+  installer = ./example.msi;
+};
+
+public = metarepo.mkPublic {
+  inherit repository;
+  publications = [ { channels.win = msi; } ];
+};
+```
+
+`mkMsi` exposes the same MSI-specific interface directly. With `mkPublication`,
+select `channels = [ "win" ];`, leave `payload` empty, and provide
+`formats.msi.installer` and `formats.msi.architecture`. Descriptive metadata is
+inferred as for other formats. Linux hooks, certificates, systemd and dependency
+options are rejected: installation and upgrade behavior belong in the MSI.
+
+Each MSI is copied unchanged with a JSON sidecar. Publishing validates the header,
+metadata and digest and writes `win/catalog.json`. Header validation checks the
+compound-document signature; it does not certify MSI tables or installability.
+Conflicting files and ambiguous package/version/release/architecture entries fail
+the build. The generated `install.ps1` uses this catalog; `install.sh` only handles
+Linux channels. `public.installPowerShell` exposes the PowerShell script directly.
+`windows11` is a metarepo alias, not an `os-release` value. Other Windows selectors
+can be configured explicitly; no Windows Server release is inferred.
+
+An HTTPS repository is required by the PowerShell installer. SHA-256 verifies the
+MSI against the HTTPS catalog; it is not an independent publisher signature.
+Authenticode signatures in prebuilt files are preserved. `GPG_KEY_ID` continues
+to sign Linux repositories and does not sign MSI files.
+
+WinGet manifests and a WinGet source are not generated. They can be added as a
+separate integration using the same installer URLs and hashes.

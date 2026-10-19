@@ -24,7 +24,7 @@
 
   `repository`
   : Attribute set with `id`, `origin`, `label`, `url` and `channels`.
-    Each channel specifies `format` (`apt`, `dnf` or `pacman`) and optional
+    Each channel specifies `format` (`apt`, `dnf`, `pacman` or `msi`) and optional
     `releases` (installer aliases, default `[ ]`). The installer also accepts
     channel names. IDs, published channels, release aliases and architectures
     must match `[a-zA-Z0-9][a-zA-Z0-9_+-]*`.
@@ -35,7 +35,11 @@
 
   APT suites share `apt/pool` with indexes under `apt/dists/<suite>`.
   Identical artifacts are stored once by SHA-256; `apt` is a reserved channel
-  name. Existing APT clients must rerun the installer to use the `/apt` URL.
+  name. MSI channels contain unchanged installers, JSON metadata and a catalog
+  with SHA-256 hashes. `installPowerShell` exposes the generated `install.ps1`,
+  which is published when MSI channels are active. MSI files are not signed by
+  `GPG_KEY_ID`; preserve any Authenticode signatures in the original installer.
+  Existing APT clients must rerun the installer to use the `/apt` URL.
 
   # Examples
 
@@ -58,6 +62,7 @@
   callPackage,
   runCommand,
   writeText,
+  python3,
 }:
 {
   publications,
@@ -93,6 +98,7 @@ let
       "apt"
       "dnf"
       "pacman"
+      "msi"
     ]) "metarepo: unsupported format '${format}' for channel '${name}'";
     {
       inherit format;
@@ -116,6 +122,21 @@ let
   aptArchitectures = repositoryArchitectures aptSuites;
   # Only evaluated publications contribute channels and installer aliases.
   selectors = name: lib.unique ([ name ] ++ channels.${name}.releases);
+  linuxChannels = lib.filter (name: channels.${name}.format != "msi") channelNames;
+  msiChannels = repositoriesOf "msi";
+  windowsChannels = map (name: {
+    inherit name;
+    selectors = selectors name;
+    architectures = lib.unique channels.${name}.architectures;
+  }) msiChannels;
+  windowsConfig = writeText "windows-channels.json" (builtins.toJSON windowsChannels);
+  psQuote = value: "'" + lib.replaceStrings [ "'" ] [ "''" ] value + "'";
+  installPowerShell = writeText "install.ps1" (
+    lib.replaceStrings
+      [ "@REPO_ROOT_PS@" "@CHANNELS_PS@" ]
+      [ (psQuote repository.url) (psQuote (builtins.toJSON windowsChannels)) ]
+      (builtins.readFile ./install.ps1)
+  );
   supportedReleases = lib.concatMap selectors channelNames;
   validToken =
     token: builtins.isString token && builtins.match "[a-zA-Z0-9][a-zA-Z0-9_+-]*" token != null;
@@ -129,7 +150,7 @@ let
       ];
     in
     "    ${lib.concatStringsSep "|" (selectors name)}) _install_${entry.format} ${arguments} ;;"
-  ) channelNames;
+  ) linuxChannels;
   installScript = writeText "install.sh" (
     lib.replaceStrings
       [ "@REPO_ROOT@" "@REPO_ID@" "@REPO_LABEL@" "@SUPPORTED@" "@INSTALL_CASES@" ]
@@ -137,25 +158,48 @@ let
         (lib.escapeShellArg repository.url)
         (lib.escapeShellArg repository.id)
         (lib.escapeShellArg repository.label)
-        (lib.escapeShellArg (lib.concatStringsSep " " supportedReleases))
+        (lib.escapeShellArg (lib.concatStringsSep " " (lib.concatMap selectors linuxChannels)))
         installCases
       ]
       (builtins.readFile ./install.sh)
   );
-  packages = runCommand "repository-packages" { } ''
-    mkdir -p "$out"
-    ${lib.concatMapStringsSep "\n" (name: ''
-      mkdir -p "$out/${name}"
-      ${lib.concatMapStringsSep "\n" (package: ''
-        cp -R ${package}/. "$out/${name}/"
-      '') channels.${name}.packages}
-    '') channelNames}
-    cp ${installScript} "$out/install.sh"
-    chmod 644 "$out/install.sh"
-    ${lib.optionalString (documentation != null) ''
-      cp -R ${lib.escapeShellArg (toString documentation)} "$out/doc"
-    ''}
-  '';
+  packages =
+    runCommand "repository-packages" { nativeBuildInputs = lib.optional (msiChannels != [ ]) python3; }
+      ''
+        mkdir -p "$out"
+        ${lib.concatMapStringsSep "\n" (name: ''
+          mkdir -p "$out/${name}"
+          ${lib.concatMapStringsSep "\n" (package: ''
+            ${
+              if channels.${name}.format == "msi" then
+                ''
+                  for file in ${package}/*; do
+                    target="$out/${name}/$(basename "$file")"
+                    if [ -e "$target" ]; then
+                      cmp "$file" "$target"
+                    else
+                      cp "$file" "$target"
+                    fi
+                  done
+                ''
+              else
+                ''
+                  cp -R ${package}/. "$out/${name}/"
+                ''
+            }
+          '') channels.${name}.packages}
+        '') channelNames}
+        ${lib.optionalString (msiChannels != [ ]) ''
+          python3 ${./msi-catalog.py} "$out" ${windowsConfig}
+          cp ${installPowerShell} "$out/install.ps1"
+          chmod 644 "$out/install.ps1"
+        ''}
+        cp ${installScript} "$out/install.sh"
+        chmod 644 "$out/install.sh"
+        ${lib.optionalString (documentation != null) ''
+          cp -R ${lib.escapeShellArg (toString documentation)} "$out/doc"
+        ''}
+      '';
   repositories = {
     apt = {
       suites = aptSuites;
@@ -197,6 +241,6 @@ assert lib.assertMsg (
 (callPackage ./mk-repository.nix { } { inherit packages repositories repository; }).overrideAttrs
   (old: {
     passthru = (old.passthru or { }) // {
-      inherit installScript;
+      inherit installScript installPowerShell;
     };
   })

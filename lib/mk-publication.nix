@@ -33,13 +33,18 @@
 
   `channels`
   : Channel names to subscribe to; defaults to all configured channels.
-    Unknown names are rejected.
+    Unknown names are rejected. In mixed repositories, select channels explicitly
+    so Linux payloads are not published to MSI channels.
 
   `independent`
   : Defaults to `false`. When true, use APT `all`, RPM `noarch` and Pacman `any`.
 
   `formats`
   : Package option overrides indexed by format; defaults to `{ }`.
+
+  For MSI channels supply `formats.msi.installer` (a prebuilt MSI) and
+  `formats.msi.architecture` (`x86`, `x64` or `arm64`); no Windows architecture
+  is inferred from the Linux build host. The payload must remain empty.
 
   `overrides`
   : Package option overrides indexed by channel; defaults to `{ }`.
@@ -83,6 +88,7 @@ let
         apt = "all";
         dnf = "noarch";
         pacman = "any";
+        msi = throw "metarepo: specify the MSI target architecture in formats.msi.architecture";
       }
     else
       {
@@ -94,6 +100,7 @@ let
           .${stdenv.hostPlatform.system};
         dnf = stdenv.hostPlatform.uname.processor;
         pacman = stdenv.hostPlatform.uname.processor;
+        msi = throw "metarepo: specify the MSI target architecture in formats.msi.architecture";
       };
   common = builtins.removeAttrs args [
     "repository"

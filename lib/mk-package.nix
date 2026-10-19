@@ -1,5 +1,5 @@
 /**
-  Build an APT, DNF or Pacman artifact from a native filesystem payload.
+  Build an APT, DNF or Pacman artifact, or publish an existing Windows MSI.
   Declarative certificate and systemd files extend the payload, dependencies
   and hooks before dispatching to the format builder. Hooks run on the target
   machine, never during the Nix build.
@@ -16,7 +16,9 @@
   # Inputs
 
   `format`
-  : One of `"apt"`, `"dnf"` or `"pacman"`.
+  : One of `"apt"`, `"dnf"`, `"pacman"` or `"msi"`. MSI requires `installer`
+    (a prebuilt file) and architecture `x86`, `x64` or `arm64`. Linux payloads,
+    integrations, hooks and dependency options are rejected for MSI.
 
   `name`, `version`, `architecture`
   : Native package name, upstream version and format-specific architecture.
@@ -85,6 +87,7 @@
   mkApt,
   mkDnf,
   mkPacman,
+  mkMsi,
 }:
 {
   format,
@@ -100,6 +103,7 @@ let
     apt = mkApt;
     dnf = mkDnf;
     pacman = mkPacman;
+    msi = mkMsi;
   };
   integration = callPackage ./package-integrations.nix { } {
     inherit
@@ -115,8 +119,15 @@ let
 in
 assert lib.assertMsg (builtins.hasAttr format builders)
   "metarepo: unsupported package format '${format}'";
-builtins.seq integration.hooks (
-  builders.${format} (
+if format == "msi" then
+  assert lib.assertMsg (
+    payload == emptyDirectory
+    && certificates == { }
+    && systemd == { }
+    && hooks == { }
+    && !refreshCertificates
+  ) "metarepo: MSI publication accepts an existing installer, not Linux payloads or integrations";
+  mkMsi (
     builtins.removeAttrs args [
       "format"
       "payload"
@@ -125,9 +136,21 @@ builtins.seq integration.hooks (
       "hooks"
       "refreshCertificates"
     ]
-    // {
-      inherit (integration) payload hooks;
-      depends = lib.unique ((args.depends or [ ]) ++ integration.depends);
-    }
   )
-)
+else
+  builtins.seq integration.hooks (
+    builders.${format} (
+      builtins.removeAttrs args [
+        "format"
+        "payload"
+        "certificates"
+        "systemd"
+        "hooks"
+        "refreshCertificates"
+      ]
+      // {
+        inherit (integration) payload hooks;
+        depends = lib.unique ((args.depends or [ ]) ++ integration.depends);
+      }
+    )
+  )

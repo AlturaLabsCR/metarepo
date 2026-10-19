@@ -26,6 +26,7 @@ Tumbleweed (<code>zypper</code>)</a></li>
 <li><a href="#arch-linux-pacman" id="toc-arch-linux-pacman">Arch Linux
 (<code>pacman</code>)</a></li>
 <li><a href="#nix" id="toc-nix">Nix</a></li>
+<li><a href="#windows-msi" id="toc-windows-msi">Windows MSI</a></li>
 </ul></li>
 </ul></nav>
   <main><h1 id="manual-repository-installation">Manual repository
@@ -105,6 +106,44 @@ package into your Nix profile:</p>
 nix profile install github:AlturaLabsCR/metarepo#hello-python</code></pre>
 <p>Or run a package without adding it to the profile:</p>
 <pre class="sh"><code>nix run github:AlturaLabsCR/metarepo#hello
-nix run github:AlturaLabsCR/metarepo#hello-python</code></pre></main>
+nix run github:AlturaLabsCR/metarepo#hello-python</code></pre>
+<h2 id="windows-msi">Windows MSI</h2>
+<p>For repositories publishing an MSI channel, download their generated
+script:</p>
+<pre class="powershell"><code>Invoke-WebRequest -Uri &#39;https://packages.example.org/metarepo/install.ps1&#39; -OutFile install.ps1
+.\install.ps1 -Package example
+.\install.ps1 -Package example -Version 1.0.0 -Architecture x64 -Silent
+.\install.ps1 -Package example -Scope User</code></pre>
+<p>Requires Windows PowerShell 5.1 or PowerShell 7 on Windows. Local
+execution policy must allow the downloaded script; it does not change
+execution policies. The default release alias <code>windows11</code>
+checks for a workstation with build 22000 or newer.
+<code>-Release</code> can select another configured Windows alias or
+channel. Architecture detection uses the native OS architecture,
+including when PowerShell runs as a 32-bit process.
+<code>-Architecture</code> overrides it explicitly.</p>
+<p>The script downloads the catalog over HTTPS, selects the matching
+MSI, verifies SHA-256, and invokes <code>msiexec</code>. With multiple
+versions it requires <code>-Version</code>; with multiple package
+revisions it also requires <code>-PackageRelease</code>. It does not
+silently select a version by filename order.</p>
+<p>The default <code>-Scope Machine</code> requests installation for all
+users and prompts for administrator elevation when needed.
+<code>-Scope User</code> requests per-user installation with
+<code>ALLUSERS=2 MSIINSTALLPERUSER=1</code> and does not explicitly
+elevate. This only works when the MSI supports per-user installation;
+the script cannot make a machine-only MSI install without the
+permissions it needs. See Microsoft’s <a
+href="https://learn.microsoft.com/en-us/windows/win32/msi/msiinstallperuser">MSIINSTALLPERUSER
+documentation</a>.</p>
+<p><code>-Silent</code> passes <code>/qn</code> to MSI; elevation may
+still display a UAC prompt. <code>-WhatIf</code> resolves the catalog
+entry without downloading or executing the MSI. All installations pass
+<code>/norestart</code>. The script reports installer failures and
+restart-required results, preserves the installation log in the
+temporary folder, and removes the downloaded MSI. It does not
+automatically uninstall other products, configure WinGet, or schedule
+future updates. Upgrade and uninstall behavior are defined by the MSI
+itself.</p></main>
 </body>
 </html>

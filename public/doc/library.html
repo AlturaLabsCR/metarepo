@@ -29,6 +29,8 @@ id="toc-lower-level-builders">Lower-level builders</a></li>
 <li><a href="#use-this-repository-as-a-template"
 id="toc-use-this-repository-as-a-template">Use this repository as a
 template</a></li>
+<li><a href="#windows-msi-publication"
+id="toc-windows-msi-publication">Windows MSI publication</a></li>
 </ul></li>
 </ul></nav>
   <main><h1 id="use-metarepo-as-a-library">Use Metarepo as a
@@ -315,14 +317,15 @@ their source entry, keeping the suite unchanged (for example,
 <code>metarepo.lib.forPkgs pkgs</code>. It exposes:</p>
 <ul>
 <li><code>mkPackage</code>: takes <code>format</code>
-(<code>"apt"</code>, <code>"dnf"</code>, <code>"pacman"</code>),
-<code>name</code>, <code>version</code>, <code>architecture</code>,
-<code>description</code>, <code>homepage</code>,
-<code>maintainer</code>, <code>license</code>, optional
-<code>depends</code>, <code>recommends</code>, <code>conflicts</code>,
-<code>provides</code> (lists), <code>release</code> (default
-<code>"1"</code>), optional <code>payload</code> (empty by default),
-<code>certificates</code>, <code>systemd</code>, <code>hooks</code> and
+(<code>"apt"</code>, <code>"dnf"</code>, <code>"pacman"</code>,
+<code>"msi"</code>), <code>name</code>, <code>version</code>,
+<code>architecture</code>, <code>description</code>,
+<code>homepage</code>, <code>maintainer</code>, <code>license</code>,
+optional <code>depends</code>, <code>recommends</code>,
+<code>conflicts</code>, <code>provides</code> (lists),
+<code>release</code> (default <code>"1"</code>), optional
+<code>payload</code> (empty by default), <code>certificates</code>,
+<code>systemd</code>, <code>hooks</code> and
 <code>refreshCertificates</code>. Dependency strings use the selected
 format’s syntax. <code>recommends</code> maps to APT/RPM
 <code>Recommends</code> and Pacman <code>optdepends</code>.</li>
@@ -336,7 +339,8 @@ across formats.</li>
 repository derivation. Its <code>builder</code> attribute is the
 executable derivation that generates <code>public/</code> in the working
 directory, with optional signing through <code>GPG_KEY_ID</code>. Its
-<code>installScript</code> attribute contains the generated
+<code>installScript</code> attribute contains the generated Linux
+installer; <code>installPowerShell</code> contains the Windows
 installer.</li>
 </ul>
 <p>No directory discovery is required by these builders. Custom package
@@ -362,6 +366,56 @@ nix run .#hello-python
 nix run .#build-public</code></pre>
 <p>The existing workflow publishes the resulting static
 <code>public/</code> directory to GitHub Pages. Configure its URL and
-signing secrets as described in the README.</p></main>
+signing secrets as described in the README.</p>
+<h2 id="windows-msi-publication">Windows MSI publication</h2>
+<p>MSI publication preserves an existing installer; metarepo does not
+compile Windows programs or turn Linux payloads into MSI files. Build
+the MSI separately and use a pinned source such as
+<code>pkgs.fetchurl</code> with <code>hash</code>.</p>
+<pre class="nix"><code>repository.channels.win = {
+  format = &quot;msi&quot;;
+  releases = [ &quot;windows11&quot; ];
+};
+
+msi = metarepo.mkPackage {
+  format = &quot;msi&quot;;
+  name = &quot;example&quot;;
+  version = &quot;1.0.0&quot;;
+  architecture = &quot;x64&quot;; # x86, x64 or arm64; target, not build host
+  installer = ./example.msi;
+};
+
+public = metarepo.mkPublic {
+  inherit repository;
+  publications = [ { channels.win = msi; } ];
+};</code></pre>
+<p><code>mkMsi</code> exposes the same MSI-specific interface directly.
+With <code>mkPublication</code>, select
+<code>channels = [ "win" ];</code>, leave <code>payload</code> empty,
+and provide <code>formats.msi.installer</code> and
+<code>formats.msi.architecture</code>. Descriptive metadata is inferred
+as for other formats. Linux hooks, certificates, systemd and dependency
+options are rejected: installation and upgrade behavior belong in the
+MSI.</p>
+<p>Each MSI is copied unchanged with a JSON sidecar. Publishing
+validates the header, metadata and digest and writes
+<code>win/catalog.json</code>. Header validation checks the
+compound-document signature; it does not certify MSI tables or
+installability. Conflicting files and ambiguous
+package/version/release/architecture entries fail the build. The
+generated <code>install.ps1</code> uses this catalog;
+<code>install.sh</code> only handles Linux channels.
+<code>public.installPowerShell</code> exposes the PowerShell script
+directly. <code>windows11</code> is a metarepo alias, not an
+<code>os-release</code> value. Other Windows selectors can be configured
+explicitly; no Windows Server release is inferred.</p>
+<p>An HTTPS repository is required by the PowerShell installer. SHA-256
+verifies the MSI against the HTTPS catalog; it is not an independent
+publisher signature. Authenticode signatures in prebuilt files are
+preserved. <code>GPG_KEY_ID</code> continues to sign Linux repositories
+and does not sign MSI files.</p>
+<p>WinGet manifests and a WinGet source are not generated. They can be
+added as a separate integration using the same installer URLs and
+hashes.</p></main>
 </body>
 </html>

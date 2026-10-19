@@ -23,15 +23,23 @@ rec {
     ```nix
     metarepo = inputs.metarepo.lib.forPkgs pkgs;
     # metarepo.mkPackage, mkPublication, mkPayload, mkSnapshots,
-    # mkPublic, mkApt, mkDnf and mkPacman are now available.
+    # mkPublic, mkApt, mkDnf, mkPacman and mkMsi are now available.
     ```
   */
   forPkgs = pkgs: rec {
     mkApt = pkgs.callPackage ./mk-apt.nix { };
     mkDnf = pkgs.callPackage ./mk-dnf.nix { };
     mkPacman = pkgs.callPackage ./mk-pacman.nix { };
+    mkMsi = pkgs.callPackage ./mk-msi.nix { };
     mkPublic = pkgs.callPackage ./mk-public.nix { };
-    mkPackage = pkgs.callPackage ./mk-package.nix { inherit mkApt mkDnf mkPacman; };
+    mkPackage = pkgs.callPackage ./mk-package.nix {
+      inherit
+        mkApt
+        mkDnf
+        mkPacman
+        mkMsi
+        ;
+    };
     mkPublication = pkgs.callPackage ./mk-publication.nix { inherit mkPackage; };
     mkPayload = pkgs.callPackage ./mk-payload.nix { };
     mkSnapshots = pkgs.callPackage ./mk-snapshots.nix { };

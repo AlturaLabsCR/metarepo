@@ -201,6 +201,7 @@ assert
         sh ${./apt-multiversion.sh} ${../lib/repository.sh}
         touch "$out"
       '';
+  msi = import ./msi.nix { inherit pkgs api; };
   integrations = import ./integrations.nix { inherit pkgs; };
   fastfetch = import ./fastfetch.nix { inherit pkgs api; };
   native-packages = import ./native-packages.nix { inherit pkgs api; };
