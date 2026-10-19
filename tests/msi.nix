@@ -44,8 +44,6 @@ let
       {
         channels.win = [
           (artifact "1.0" "x64")
-          (artifact "2.9" "x64")
-          (artifact "2.10" "x64")
           (artifact "2.0" "arm64")
         ];
       }

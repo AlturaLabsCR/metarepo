@@ -409,19 +409,6 @@ generated <code>install.ps1</code> uses this catalog;
 directly. <code>windows11</code> is a metarepo alias, not an
 <code>os-release</code> value. Other Windows selectors can be configured
 explicitly; no Windows Server release is inferred.</p>
-<p>Browser download aliases are generated at
-<code>win/&lt;name&gt;/</code> and
-<code>win/&lt;name&gt;/&lt;architecture&gt;/</code>. They point to the
-newest published version, then release, using GNU version ordering (for
-example, <code>2.10</code> follows <code>2.9</code>). These small HTML
-pages use an immediate <code>meta refresh</code> and a fallback link;
-they contain no JavaScript and do not duplicate installers. When a
-package has multiple architectures, <code>win/&lt;name&gt;/</code>
-displays architecture links instead of guessing. Aliases update on each
-publication; commented-out versions are not considered. These are
-browser redirects, not HTTP redirects: <code>curl -L</code> and
-PowerShell clients must use the MSI URLs from <code>catalog.json</code>
-instead. <code>install.ps1</code> selection is unchanged.</p>
 <p>An HTTPS repository is required by the PowerShell installer. SHA-256
 verifies the MSI against the HTTPS catalog; it is not an independent
 publisher signature. Authenticode signatures in prebuilt files are
