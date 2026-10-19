@@ -559,6 +559,11 @@ Optional directory copied under <code>public/doc</code>; defaults to
 reserved.
 </dd>
 </dl>
+<p>APT suites share <code>apt/pool</code> with indexes under
+<code>apt/dists/&lt;suite&gt;</code>. Identical artifacts are stored
+once by SHA-256; <code>apt</code> is a reserved channel name. Existing
+APT clients must rerun the installer to use the <code>/apt</code>
+URL.</p>
 <h3 id="examples-11">Examples</h3>
 <pre class="nix"><code>public = metarepo.mkPublic {
   publications = [ publication ];

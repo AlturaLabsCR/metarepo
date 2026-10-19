@@ -141,6 +141,15 @@ assert public.installScript == directPublic.installScript;
 assert
   !(builtins.tryEval
     (api.mkPublic {
+      repository = repository // {
+        channels.apt.format = "dnf";
+      };
+      publications = [ ];
+    }).drvPath
+  ).success;
+assert
+  !(builtins.tryEval
+    (api.mkPublic {
       inherit repository;
       publications = [ { channels.stable = (builtins.head directPublications).channels.next; } ];
     }).drvPath
@@ -184,6 +193,8 @@ assert
           pkgs.dpkg
           pkgs.apt
           pkgs.gzip
+          pkgs.diffutils
+          pkgs.gnupg
         ];
       }
       ''
@@ -218,7 +229,7 @@ assert
     SH
         sh functions.sh
         # Exercise detection and RPM setup against an isolated filesystem.
-        sed 's|/etc/|./etc/|g; s|/usr/lib/os-release|./usr/lib/os-release|g' functions.sh \
+        sed 's|/etc/|./etc/|g; s|/usr/lib/os-release|./usr/lib/os-release|g; s|/usr/share/keyrings|./usr/share/keyrings|g' functions.sh \
           | sed '/^[[:space:]]*_install_apt() { printf/,$d' > isolated.sh
         mkdir -p etc
         cat >> isolated.sh <<'SH'
@@ -229,6 +240,11 @@ assert
         printf 'ID=opensuse-leap\nVERSION_ID=99.0\n' > etc/os-release
         if (_get_release) 2>/dev/null; then exit 1; fi
         curl() { printf key > "$2"; }
+        dpkg() { printf 'amd64\n'; }
+        apt-get() { [ "$1" = update ]; }
+        mkdir -p usr/share/keyrings etc/apt/sources.list.d
+        _install_apt stable 'all amd64'
+        grep -F 'https://example.invalid/packages/apt stable main' etc/apt/sources.list.d/test.list
         rpm() { [ "$1" = --import ] && [ -f "$2" ]; }
         zypper() { printf '%s\n' "$*" > zypper.log; }
         _install_release opensuse-tumbleweed

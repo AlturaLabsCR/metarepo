@@ -38,13 +38,27 @@ for suite in $APT_SUITES; do
     cd "$suite"
     architectures="$(apt_architectures "$suite")"
     mkdir -p pool/main
-    mv ./*.deb pool/main/
+    # Index only this suite's packages, but publish their bytes once. Hash
+    # directories also distinguish distro builds with identical filenames.
+    for package in ./*.deb; do
+      digest="$(sha256sum "$package" | cut -d ' ' -f 1)"
+      relative="pool/main/$digest/${package##*/}"
+      shared="../apt/$relative"
+      mkdir -p "$(dirname "$shared")" "pool/main/$digest"
+      if [ -f "$shared" ]; then
+        cmp "$package" "$shared"
+        rm "$package"
+      else
+        mv "$package" "$shared"
+      fi
+      ln "$shared" "$relative"
+    done
     release="dists/$suite"
     for arch in $architectures; do
       index="$release/main/binary-$arch/Packages"
       mkdir -p "$(dirname "$index")"
       versions="$(
-        for package in pool/main/*.deb; do
+        for package in pool/main/*/*.deb; do
           case "$package" in
             *_"$arch".deb|*_all.deb)
               dpkg-deb --show --showformat='${Package} ${Version}\n' "$package" || exit 1
@@ -74,7 +88,13 @@ for suite in $APT_SUITES; do
       sign --clearsign --output "$release/InRelease" "$release/Release"
       sign --armor --detach-sign --output "$release/Release.gpg" "$release/Release"
     fi
+    mkdir -p ../apt/dists
+    mv "$release" ../apt/dists/
+    # These hard links were only needed to scope dpkg-scanpackages to a suite.
+    rm -r pool
+    rmdir dists
   )
+  rmdir "$suite"
 done
 
 for repository in $PACMAN_REPOSITORIES; do

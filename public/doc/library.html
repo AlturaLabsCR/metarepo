@@ -298,6 +298,18 @@ and dependencies remain the project’s responsibility. Add distribution
 support for an existing format in the relevant
 <code>packages/&lt;name&gt;/public.nix</code>; supporting a new package
 format requires library code.</p>
+<p>APT channels share one repository at
+<code>&lt;repository.url&gt;/apt</code>: suite indexes live under
+<code>apt/dists/&lt;channel&gt;</code> and binary files under
+<code>apt/pool/main/&lt;sha256&gt;/&lt;filename&gt;</code>. Identical
+files across suites are published once. Different builds with the same
+filename stay separate, and each suite indexes only its own packages.
+This reduces static hosting and Pages artifacts without depending on
+filesystem links. The channel name <code>apt</code> is reserved.</p>
+<p>This changes the APT base URL from <code>/&lt;channel&gt;</code> to
+<code>/apt</code>. Existing clients must rerun the installer or update
+their source entry, keeping the suite unchanged (for example,
+<code>/apt noble main</code>). RPM and Pacman URLs are unchanged.</p>
 <h2 id="lower-level-builders">Lower-level builders</h2>
 <p>For projects with a different layout, use
 <code>metarepo.lib.forPkgs pkgs</code>. It exposes:</p>

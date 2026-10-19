@@ -38,8 +38,8 @@ _install_apt() {
 
   install -d -m 0755 /usr/share/keyrings
   curl -fsSLo "/usr/share/keyrings/$REPO_KEY" "$REPO_ROOT/$REPO_KEY"
-  printf 'deb [arch=%s signed-by=/usr/share/keyrings/%s] %s/%s %s main\n' \
-    "$architecture" "$REPO_KEY" "$REPO_ROOT" "$suite" "$suite" \
+  printf 'deb [arch=%s signed-by=/usr/share/keyrings/%s] %s/apt %s main\n' \
+    "$architecture" "$REPO_KEY" "$REPO_ROOT" "$suite" \
     > "/etc/apt/sources.list.d/$REPO_ID.list"
   apt-get update
 }

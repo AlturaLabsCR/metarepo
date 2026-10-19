@@ -507,6 +507,10 @@ mkPublic :: AttrSet -> Derivation
 : Optional directory copied under `public/doc`; defaults to `null`.
   When supplied, the channel name `doc` is reserved.
 
+APT suites share `apt/pool` with indexes under `apt/dists/<suite>`.
+Identical artifacts are stored once by SHA-256; `apt` is a reserved channel
+name. Existing APT clients must rerun the installer to use the `/apt` URL.
+
 ### Examples
 
 ```nix

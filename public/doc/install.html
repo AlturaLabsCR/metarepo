@@ -44,7 +44,7 @@ when that architecture is published.</p>
 <pre class="sh"><code>BASE_URL=https://packages.example.org/metarepo
 sudo install -d -m 0755 /etc/apt/keyrings
 curl -fsSL &quot;$BASE_URL/metarepo.asc&quot; | sudo gpg --dearmor --yes -o /etc/apt/keyrings/metarepo.gpg
-echo &quot;deb [arch=amd64 signed-by=/etc/apt/keyrings/metarepo.gpg] $BASE_URL/noble noble main&quot; \
+echo &quot;deb [arch=amd64 signed-by=/etc/apt/keyrings/metarepo.gpg] $BASE_URL/apt noble main&quot; \
   | sudo tee /etc/apt/sources.list.d/metarepo.list &gt;/dev/null
 sudo apt update
 sudo apt install metarepo-hello-c metarepo-hello-python</code></pre>

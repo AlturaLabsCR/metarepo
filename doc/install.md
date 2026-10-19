@@ -15,7 +15,7 @@ Use a suite published by the repository, such as `noble` or `jammy`. Change
 BASE_URL=https://packages.example.org/metarepo
 sudo install -d -m 0755 /etc/apt/keyrings
 curl -fsSL "$BASE_URL/metarepo.asc" | sudo gpg --dearmor --yes -o /etc/apt/keyrings/metarepo.gpg
-echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/metarepo.gpg] $BASE_URL/noble noble main" \
+echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/metarepo.gpg] $BASE_URL/apt noble main" \
   | sudo tee /etc/apt/sources.list.d/metarepo.list >/dev/null
 sudo apt update
 sudo apt install metarepo-hello-c metarepo-hello-python

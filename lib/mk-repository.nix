@@ -43,6 +43,7 @@
   createrepo_c,
   gnupg,
   coreutils,
+  diffutils,
   gzip,
 }:
 {
@@ -59,6 +60,7 @@ let
     createrepo_c
     gnupg
     coreutils
+    diffutils
     gzip
   ];
   generate = writeScriptBin "build-repository" ''
