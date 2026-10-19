@@ -48,7 +48,7 @@ _install_dnf() {
   if command -v zypper >/dev/null 2>&1; then
     _install_zypper "$1" "$2"
   else
-    _install_rpm "$1" "$2" /etc/yum.repos.d
+    _install_rpm "$1" "$2" /etc/yum.repos.d "$REPO_ID"
   fi
 }
 
@@ -82,6 +82,7 @@ pkg_gpgcheck=1
 repo_gpgcheck=0
 gpgkey=file:///etc/pki/rpm-gpg/$REPO_KEY
 INI
+
 }
 
 _install_pacman() {

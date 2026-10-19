@@ -254,7 +254,9 @@ assert
         grep -Fx -- '--non-interactive refresh test' zypper.log
         unset -f zypper
         _install_dnf next noarch
-        test -f etc/yum.repos.d/test-next.repo
+        grep -Fx '[test]' etc/yum.repos.d/test.repo
+        grep -Fx 'baseurl=https://example.invalid/packages/next/' etc/yum.repos.d/test.repo
+
     SH
         sh isolated.sh
         touch "$out"
