@@ -404,3 +404,35 @@ the first three numeric version components. Names may include spaces but not
 path separators. Installations require administrator permissions. Registry values
 and shortcuts are declarative; the builder runs no custom installation actions.
 Building or inspecting an MSI on Linux does not verify installation on Windows.
+
+
+### Per-snapshot publication and inherited channels
+
+`mkPublication` accepts `snapshotOptions = snapshot: { ...; }`. The callback
+receives each built snapshot and can choose its channels, payload, architecture
+independence, format options, and channel overrides. Structured options can also
+be stored in the snapshot's `publication` record. Sources and built packages are
+unchanged; a single snapshot can supply several publication formats.
+
+```nix
+metarepo.mkPublication {
+  inherit repository package;
+  maintainer = "Example Authors";
+  snapshotOptions = snapshot: snapshot.nativePublication;
+  # Alternatively, compute formats or overrides directly from each package:
+  formats = snapshot: { apt.description = snapshot.meta.description; };
+}
+```
+
+Precedence is inferred metadata, common options, snapshot `publication`,
+`snapshotOptions`, format options, then channel overrides. `formats` and
+`overrides` may be attribute sets or functions from each snapshot to those sets.
+A value supplied by `snapshotOptions` replaces the corresponding common option.
+
+A channel may declare `inherits = "parent"`. When its parent is published, the
+alias reuses exactly the same artifact, including transitive aliases. Publishing
+only an alias does not publish its parent. To build a distinct alias artifact,
+select the alias in `channels` and provide an explicit `overrides.<alias>` entry.
+Aliases must use their parent's format; missing parents and cycles are errors.
+Different snapshots may subscribe to different channels. Channel lists aggregate
+only the snapshots that subscribe to them, including their inherited aliases.

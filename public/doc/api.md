@@ -576,7 +576,7 @@ Infer native metadata from `pname`, `version` and `meta`, and infer architecture
 from the host platform. APT inference supports x86_64-linux and aarch64-linux.
 
 Options merge in this order: inferred metadata, common package options,
-snapshot `passthru.publication`, format options, channel overrides.
+snapshot `passthru.publication`, `snapshotOptions`, format options, channel overrides.
 The repository channel always determines the final format.
 
 Return `{ channels.<name> = [ artifact ... ]; }` for `mkPublic`.
@@ -605,21 +605,34 @@ mkPublication :: AttrSet -> AttrSet
 
 `channels`
 : Channel names to subscribe to; defaults to all configured channels.
-  Unknown names are rejected. In mixed repositories, select channels explicitly
+  Unknown names are rejected. Channels with `inherits` reuse their parent artifact
+  and are included when a parent is selected. A selected alias with an explicit
+  channel override builds its own artifact. Parent formats must match, and
+  unknown parents and inheritance cycles are rejected.
+  In mixed repositories, select channels explicitly
   so Linux payloads are not published to MSI channels.
 
 `independent`
 : Defaults to `false`. When true, use APT `all`, RPM `noarch` and Pacman `any`.
 
 `formats`
-: Package option overrides indexed by format; defaults to `{ }`.
+: Package option overrides indexed by format, or a function from the snapshot
+  package to that attribute set; defaults to `{ }`.
 
 For MSI channels supply `formats.msi.installer` (a prebuilt MSI) and
 `formats.msi.architecture` (`x86`, `x64` or `arm64`); no Windows architecture
 is inferred from the Linux build host. The payload must remain empty.
 
 `overrides`
-: Package option overrides indexed by channel; defaults to `{ }`.
+: Package option overrides indexed by channel, or a function from the snapshot
+  package to that attribute set; defaults to `{ }`.
+
+`snapshotOptions`
+: Function from each built snapshot package to publication options, default
+  `_: { }`. Can select `channels`, `payload`, `independent`, `formats`,
+  `overrides` and common package metadata per snapshot. The snapshot
+  `passthru.publication` also accepts those structured options.
+  Snapshot sources and package derivations are not modified.
 
 Additional attributes are common `mkPackage` options. Supply `maintainer`,
 which cannot be inferred from the Nix package.

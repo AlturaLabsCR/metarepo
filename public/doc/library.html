@@ -443,6 +443,38 @@ include spaces but not path separators. Installations require
 administrator permissions. Registry values and shortcuts are
 declarative; the builder runs no custom installation actions. Building
 or inspecting an MSI on Linux does not verify installation on
-Windows.</p></main>
+Windows.</p>
+<h3 id="per-snapshot-publication-and-inherited-channels">Per-snapshot
+publication and inherited channels</h3>
+<p><code>mkPublication</code> accepts
+<code>snapshotOptions = snapshot: { ...; }</code>. The callback receives
+each built snapshot and can choose its channels, payload, architecture
+independence, format options, and channel overrides. Structured options
+can also be stored in the snapshot’s <code>publication</code> record.
+Sources and built packages are unchanged; a single snapshot can supply
+several publication formats.</p>
+<pre class="nix"><code>metarepo.mkPublication {
+  inherit repository package;
+  maintainer = &quot;Example Authors&quot;;
+  snapshotOptions = snapshot: snapshot.nativePublication;
+  # Alternatively, compute formats or overrides directly from each package:
+  formats = snapshot: { apt.description = snapshot.meta.description; };
+}</code></pre>
+<p>Precedence is inferred metadata, common options, snapshot
+<code>publication</code>, <code>snapshotOptions</code>, format options,
+then channel overrides. <code>formats</code> and <code>overrides</code>
+may be attribute sets or functions from each snapshot to those sets. A
+value supplied by <code>snapshotOptions</code> replaces the
+corresponding common option.</p>
+<p>A channel may declare <code>inherits = "parent"</code>. When its
+parent is published, the alias reuses exactly the same artifact,
+including transitive aliases. Publishing only an alias does not publish
+its parent. To build a distinct alias artifact, select the alias in
+<code>channels</code> and provide an explicit
+<code>overrides.&lt;alias&gt;</code> entry. Aliases must use their
+parent’s format; missing parents and cycles are errors. Different
+snapshots may subscribe to different channels. Channel lists aggregate
+only the snapshots that subscribe to them, including their inherited
+aliases.</p></main>
 </body>
 </html>

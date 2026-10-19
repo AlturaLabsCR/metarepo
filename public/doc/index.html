@@ -635,9 +635,9 @@ channels. Infer native metadata from <code>pname</code>,
 the host platform. APT inference supports x86_64-linux and
 aarch64-linux.</p>
 <p>Options merge in this order: inferred metadata, common package
-options, snapshot <code>passthru.publication</code>, format options,
-channel overrides. The repository channel always determines the final
-format.</p>
+options, snapshot <code>passthru.publication</code>,
+<code>snapshotOptions</code>, format options, channel overrides. The
+repository channel always determines the final format.</p>
 <p>Return <code>{ channels.&lt;name&gt; = [ artifact ... ]; }</code> for
 <code>mkPublic</code>. When <code>package.passthru.snapshots</code>
 exists, every snapshot is published.</p>
@@ -666,8 +666,12 @@ payload depends on a snapshot’s contents.
 <dt><code>channels</code></dt>
 <dd>
 Channel names to subscribe to; defaults to all configured channels.
-Unknown names are rejected. In mixed repositories, select channels
-explicitly so Linux payloads are not published to MSI channels.
+Unknown names are rejected. Channels with <code>inherits</code> reuse
+their parent artifact and are included when a parent is selected. A
+selected alias with an explicit channel override builds its own
+artifact. Parent formats must match, and unknown parents and inheritance
+cycles are rejected. In mixed repositories, select channels explicitly
+so Linux payloads are not published to MSI channels.
 </dd>
 <dt><code>independent</code></dt>
 <dd>
@@ -676,8 +680,8 @@ Defaults to <code>false</code>. When true, use APT <code>all</code>, RPM
 </dd>
 <dt><code>formats</code></dt>
 <dd>
-Package option overrides indexed by format; defaults to
-<code>{ }</code>.
+Package option overrides indexed by format, or a function from the
+snapshot package to that attribute set; defaults to <code>{ }</code>.
 </dd>
 </dl>
 <p>For MSI channels supply <code>formats.msi.installer</code> (a
@@ -688,8 +692,17 @@ remain empty.</p>
 <dl>
 <dt><code>overrides</code></dt>
 <dd>
-Package option overrides indexed by channel; defaults to
-<code>{ }</code>.
+Package option overrides indexed by channel, or a function from the
+snapshot package to that attribute set; defaults to <code>{ }</code>.
+</dd>
+<dt><code>snapshotOptions</code></dt>
+<dd>
+Function from each built snapshot package to publication options,
+default <code>_: { }</code>. Can select <code>channels</code>,
+<code>payload</code>, <code>independent</code>, <code>formats</code>,
+<code>overrides</code> and common package metadata per snapshot. The
+snapshot <code>passthru.publication</code> also accepts those structured
+options. Snapshot sources and package derivations are not modified.
 </dd>
 </dl>
 <p>Additional attributes are common <code>mkPackage</code> options.
