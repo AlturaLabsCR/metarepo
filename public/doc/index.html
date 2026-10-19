@@ -31,6 +31,8 @@ id="toc-metarepo.mkapt"><code>metarepo.mkApt</code></a></li>
 id="toc-metarepo.mkdnf"><code>metarepo.mkDnf</code></a></li>
 <li><a href="#metarepo.mkmsi"
 id="toc-metarepo.mkmsi"><code>metarepo.mkMsi</code></a></li>
+<li><a href="#metarepo.mkmsiinstaller"
+id="toc-metarepo.mkmsiinstaller"><code>metarepo.mkMsiInstaller</code></a></li>
 <li><a href="#metarepo.mkpackage"
 id="toc-metarepo.mkpackage"><code>metarepo.mkPackage</code></a></li>
 <li><a href="#metarepo.mkpackages"
@@ -69,7 +71,7 @@ A Nixpkgs package set. Native package builders require Linux.
 <h3 id="examples">Examples</h3>
 <pre class="nix"><code>metarepo = inputs.metarepo.lib.forPkgs pkgs;
 # metarepo.mkPackage, mkPublication, mkPayload, mkSnapshots,
-# mkPublic, mkApt, mkDnf, mkPacman and mkMsi are now available.</code></pre>
+# mkPublic, mkApt, mkDnf, mkPacman, mkMsi and mkMsiInstaller are now available.</code></pre>
 <h2
 id="metarepo.internal.hooks"><code>metarepo.internal.hooks</code></h2>
 <p>Internal composer for package installation and removal actions.
@@ -327,6 +329,31 @@ descriptive metadata is accepted for consistency with
 <p>Return a directory containing the MSI and its JSON metadata with
 SHA-256, plus
 <code>passthru.metarepo = { format = "msi"; architecture; }</code>.</p>
+<h2
+id="metarepo.mkmsiinstaller"><code>metarepo.mkMsiInstaller</code></h2>
+<p>Build a Windows x64 MSI from an already prepared Windows filesystem
+tree. Compilers, runtimes and application-specific configuration belong
+to callers.</p>
+<h3 id="inputs-8">Inputs</h3>
+<p><code>name</code>, <code>version</code>, <code>payload</code>:
+Product identity and Windows files to package.
+<code>manufacturer</code>: Vendor directory and MSI manufacturer,
+default <code>Metarepo</code>. <code>family</code>: Upgrade identity and
+installation directory, default <code>name</code>. Products sharing a
+family replace one another, including equal MSI versions.
+<code>launcher</code>: Optional relative file path receiving a Start
+Menu shortcut. <code>registry</code>: Optional records with
+<code>key</code>, <code>value</code>, optional <code>name</code>,
+<code>root</code> (default <code>HKLM</code>) and <code>type</code>
+(default <code>string</code>). MSI directory properties such as
+<code>[INSTALLDIR]</code> can be used in values. No custom actions are
+executed.</p>
+<p>The result is an unsigned MSI file built on Linux with wixl.
+Installation is per-machine and requires Windows administrator
+permissions. Windows execution and MSI signing are separate from
+construction. Use the result as <code>installer</code> in
+<code>mkMsi</code> or <code>mkPackage { format = "msi"; ...; }</code>
+for catalog publication.</p>
 <h2 id="metarepo.mkpackage"><code>metarepo.mkPackage</code></h2>
 <p>Build an APT, DNF or Pacman artifact, or publish an existing Windows
 MSI. Declarative certificate and systemd files extend the payload,
@@ -336,7 +363,7 @@ run on the target machine, never during the Nix build.</p>
 <code>passthru.metarepo = { format; architecture; }</code>.</p>
 <h3 id="type-7">Type</h3>
 <pre><code>mkPackage :: AttrSet -&gt; Derivation</code></pre>
-<h3 id="inputs-8">Inputs</h3>
+<h3 id="inputs-9">Inputs</h3>
 <dl>
 <dt><code>format</code></dt>
 <dd>
@@ -437,7 +464,7 @@ Only packages declared for a system are evaluated on that system.</p>
 without evaluating Nixpkgs or repository configuration.</p>
 <h3 id="type-8">Type</h3>
 <pre><code>mkPackages :: AttrSet -&gt; AttrSet</code></pre>
-<h3 id="inputs-9">Inputs</h3>
+<h3 id="inputs-10">Inputs</h3>
 <dl>
 <dt><code>packagesDir</code></dt>
 <dd>
@@ -472,7 +499,7 @@ integrations. Prefer <code>mkPackage</code> to infer certificate/systemd
 dependencies and actions.</p>
 <h3 id="type-9">Type</h3>
 <pre><code>mkPacman :: AttrSet -&gt; Derivation</code></pre>
-<h3 id="inputs-10">Inputs</h3>
+<h3 id="inputs-11">Inputs</h3>
 <dl>
 <dt><code>name</code>, <code>version</code>, <code>payload</code>,
 <code>architecture</code>, <code>description</code>,
@@ -517,7 +544,7 @@ references. Use a portable build or assemble a custom payload when
 relocation is needed.</p>
 <h3 id="type-10">Type</h3>
 <pre><code>mkPayload :: AttrSet -&gt; Derivation</code></pre>
-<h3 id="inputs-11">Inputs</h3>
+<h3 id="inputs-12">Inputs</h3>
 <dl>
 <dt><code>package</code></dt>
 <dd>
@@ -550,7 +577,7 @@ or <code>.env</code>. Its <code>installScript</code> is the generated
 installer.</p>
 <h3 id="type-11">Type</h3>
 <pre><code>mkPublic :: AttrSet -&gt; Derivation</code></pre>
-<h3 id="inputs-12">Inputs</h3>
+<h3 id="inputs-13">Inputs</h3>
 <dl>
 <dt><code>publications</code></dt>
 <dd>
@@ -616,7 +643,7 @@ format.</p>
 exists, every snapshot is published.</p>
 <h3 id="type-12">Type</h3>
 <pre><code>mkPublication :: AttrSet -&gt; AttrSet</code></pre>
-<h3 id="inputs-13">Inputs</h3>
+<h3 id="inputs-14">Inputs</h3>
 <dl>
 <dt><code>repository</code></dt>
 <dd>
@@ -685,7 +712,7 @@ each snapshot’s native publication options under
 preserved.</p>
 <h3 id="type-13">Type</h3>
 <pre><code>mkSnapshots :: AttrSet -&gt; Derivation</code></pre>
-<h3 id="inputs-14">Inputs</h3>
+<h3 id="inputs-15">Inputs</h3>
 <dl>
 <dt><code>snapshots</code></dt>
 <dd>

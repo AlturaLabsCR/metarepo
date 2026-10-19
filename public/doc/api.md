@@ -23,7 +23,7 @@ forPkgs :: AttrSet -> AttrSet
 ```nix
 metarepo = inputs.metarepo.lib.forPkgs pkgs;
 # metarepo.mkPackage, mkPublication, mkPayload, mkSnapshots,
-# mkPublic, mkApt, mkDnf, mkPacman and mkMsi are now available.
+# mkPublic, mkApt, mkDnf, mkPacman, mkMsi and mkMsiInstaller are now available.
 ```
 
 ## `metarepo.internal.hooks`
@@ -287,6 +287,27 @@ Standard descriptive metadata is accepted for consistency with `mkPackage`.
 
 Return a directory containing the MSI and its JSON metadata with SHA-256,
 plus `passthru.metarepo = { format = "msi"; architecture; }`.
+
+## `metarepo.mkMsiInstaller`
+
+Build a Windows x64 MSI from an already prepared Windows filesystem tree.
+Compilers, runtimes and application-specific configuration belong to callers.
+
+### Inputs
+
+`name`, `version`, `payload`: Product identity and Windows files to package.
+`manufacturer`: Vendor directory and MSI manufacturer, default `Metarepo`.
+`family`: Upgrade identity and installation directory, default `name`.
+  Products sharing a family replace one another, including equal MSI versions.
+`launcher`: Optional relative file path receiving a Start Menu shortcut.
+`registry`: Optional records with `key`, `value`, optional `name`, `root`
+  (default `HKLM`) and `type` (default `string`). MSI directory properties such
+  as `[INSTALLDIR]` can be used in values. No custom actions are executed.
+
+The result is an unsigned MSI file built on Linux with wixl. Installation is
+per-machine and requires Windows administrator permissions. Windows execution
+and MSI signing are separate from construction. Use the result as `installer`
+in `mkMsi` or `mkPackage { format = "msi"; ...; }` for catalog publication.
 
 ## `metarepo.mkPackage`
 

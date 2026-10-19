@@ -375,3 +375,32 @@ to sign Linux repositories and does not sign MSI files.
 
 WinGet manifests and a WinGet source are not generated. They can be added as a
 separate integration using the same installer URLs and hashes.
+
+
+### Constructing MSI files on Linux
+
+`mkMsiInstaller` turns a Windows payload directory into a machine-wide x64 MSI
+using wixl. It does not compile applications. Define each application's Windows
+build in its own repository, then pass the resulting files:
+
+```nix
+installer = metarepo.mkMsiInstaller {
+  name = "example";
+  version = "1.2.3";
+  manufacturer = "Example";
+  payload = windowsFiles;
+  launcher = "example.exe"; # optional Start Menu shortcut
+  family = "example"; # shared upgrade identity and installation directory
+  registry = [
+    { key = "Software\\Example"; name = "Path"; value = "[INSTALLDIR]example.exe"; }
+  ];
+};
+```
+
+Pass `installer` to `mkMsi` or `mkPackage { format = "msi"; ...; }` to publish it.
+Products sharing a `family` replace one another, including equal MSI versions;
+use different families for applications that should coexist. ProductVersion is
+the first three numeric version components. Names may include spaces but not
+path separators. Installations require administrator permissions. Registry values
+and shortcuts are declarative; the builder runs no custom installation actions.
+Building or inspecting an MSI on Linux does not verify installation on Windows.

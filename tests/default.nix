@@ -201,6 +201,7 @@ assert
         sh ${./apt-multiversion.sh} ${../lib/repository.sh}
         touch "$out"
       '';
+  msi-installer = import ./msi-installer.nix { inherit pkgs api; };
   msi = import ./msi.nix { inherit pkgs api; };
   integrations = import ./integrations.nix { inherit pkgs; };
   fastfetch = import ./fastfetch.nix { inherit pkgs api; };

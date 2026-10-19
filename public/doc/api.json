@@ -6,7 +6,7 @@
       "id": "metarepo.forPkgs",
       "attrPath": "metarepo.forPkgs",
       "name": "forPkgs",
-      "description": "Bind the package and repository builders to a Nixpkgs package set.\nThe builders use that set's overlays, configuration and host platform.\n\n# Type\n\n```\nforPkgs :: AttrSet -> AttrSet\n```\n\n# Inputs\n\n`pkgs`\n: A Nixpkgs package set. Native package builders require Linux.\n\n# Examples\n\n```nix\nmetarepo = inputs.metarepo.lib.forPkgs pkgs;\n# metarepo.mkPackage, mkPublication, mkPayload, mkSnapshots,\n# mkPublic, mkApt, mkDnf, mkPacman and mkMsi are now available.\n```",
+      "description": "Bind the package and repository builders to a Nixpkgs package set.\nThe builders use that set's overlays, configuration and host platform.\n\n# Type\n\n```\nforPkgs :: AttrSet -> AttrSet\n```\n\n# Inputs\n\n`pkgs`\n: A Nixpkgs package set. Native package builders require Linux.\n\n# Examples\n\n```nix\nmetarepo = inputs.metarepo.lib.forPkgs pkgs;\n# metarepo.mkPackage, mkPublication, mkPayload, mkSnapshots,\n# mkPublic, mkApt, mkDnf, mkPacman, mkMsi and mkMsiInstaller are now available.\n```",
       "groups": [],
       "source": {
         "file": "lib/default.nix",
@@ -95,6 +95,18 @@
       "source": {
         "file": "lib/mk-msi.nix",
         "line": 15,
+        "column": 1
+      }
+    },
+    {
+      "id": "metarepo.mkMsiInstaller",
+      "attrPath": "metarepo.mkMsiInstaller",
+      "name": "mkMsiInstaller",
+      "description": "Build a Windows x64 MSI from an already prepared Windows filesystem tree.\nCompilers, runtimes and application-specific configuration belong to callers.\n\n# Inputs\n\n`name`, `version`, `payload`: Product identity and Windows files to package.\n`manufacturer`: Vendor directory and MSI manufacturer, default `Metarepo`.\n`family`: Upgrade identity and installation directory, default `name`.\n  Products sharing a family replace one another, including equal MSI versions.\n`launcher`: Optional relative file path receiving a Start Menu shortcut.\n`registry`: Optional records with `key`, `value`, optional `name`, `root`\n  (default `HKLM`) and `type` (default `string`). MSI directory properties such\n  as `[INSTALLDIR]` can be used in values. No custom actions are executed.\n\nThe result is an unsigned MSI file built on Linux with wixl. Installation is\nper-machine and requires Windows administrator permissions. Windows execution\nand MSI signing are separate from construction. Use the result as `installer`\nin `mkMsi` or `mkPackage { format = \"msi\"; ...; }` for catalog publication.",
+      "groups": [],
+      "source": {
+        "file": "lib/mk-msi-installer.nix",
+        "line": 21,
         "column": 1
       }
     },
