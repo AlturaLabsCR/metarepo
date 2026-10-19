@@ -368,6 +368,16 @@ Linux channels. `public.installPowerShell` exposes the PowerShell script directl
 `windows11` is a metarepo alias, not an `os-release` value. Other Windows selectors
 can be configured explicitly; no Windows Server release is inferred.
 
+Browser download aliases are generated at `win/<name>/` and
+`win/<name>/<architecture>/`. They point to the newest published version, then
+release, using GNU version ordering (for example, `2.10` follows `2.9`). These
+small HTML pages use an immediate `meta refresh` and a fallback link; they contain
+no JavaScript and do not duplicate installers. When a package has multiple
+architectures, `win/<name>/` displays architecture links instead of guessing.
+Aliases update on each publication; commented-out versions are not considered.
+These are browser redirects, not HTTP redirects: `curl -L` and PowerShell clients
+must use the MSI URLs from `catalog.json` instead. `install.ps1` selection is unchanged.
+
 An HTTPS repository is required by the PowerShell installer. SHA-256 verifies the
 MSI against the HTTPS catalog; it is not an independent publisher signature.
 Authenticode signatures in prebuilt files are preserved. `GPG_KEY_ID` continues
